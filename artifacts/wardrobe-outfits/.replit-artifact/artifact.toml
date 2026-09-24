@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Wardrobe"
+description = "A personal, mobile-friendly wardrobe prototype for adding clothing photos, exploring three hand-curated casual outfit combinations made only from the user's items, saving outfits, and recording wear feedback."
+version = "1.0.0"
+id = "artifacts/wardrobe-outfits"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21073
+
+[services.development]
+run = "pnpm --filter @workspace/wardrobe-outfits run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/wardrobe-outfits", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/wardrobe-outfits/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21073"
+BASE_PATH = "/"
