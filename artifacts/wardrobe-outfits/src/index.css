@@ -479,75 +479,77 @@
 
 .outfit-board {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0.55rem;
-  min-height: 250px;
-  aspect-ratio: 4 / 3;
-  padding: 0.7rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+  width: 100%;
+  height: clamp(190px, 58vw, 224px);
+  padding: 0.55rem;
+  overflow: hidden;
+  border-radius: 1rem;
   background: #f2ecdf;
 }
 
-.outfit-board-with-extras {
-  grid-template-columns: minmax(0, 1fr) minmax(84px, 0.48fr);
+.outfit-board-piece-top {
+  grid-column: 1;
+  grid-row: 1;
 }
 
-.outfit-board-core {
-  display: grid;
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-  gap: 0.55rem;
-  min-width: 0;
-  min-height: 0;
+.outfit-board-piece-bottom {
+  grid-column: 2;
+  grid-row: 1 / span 2;
 }
 
-.outfit-board-one-piece {
-  grid-template-rows: minmax(0, 1fr);
+.outfit-board-piece-one-piece {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.outfit-board-one-piece:not(.outfit-board-with-extras) .outfit-board-piece-one-piece {
+  grid-column: 1 / span 2;
 }
 
 .outfit-board-extras {
   display: grid;
-  grid-auto-rows: minmax(0, 1fr);
-  gap: 0.55rem;
+  grid-column: 1;
+  grid-row: 2;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 0.25rem;
   min-width: 0;
   min-height: 0;
 }
 
 .outfit-board-piece {
-  position: relative;
-  display: flex;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
   min-width: 0;
   min-height: 0;
-  align-items: center;
-  justify-content: center;
   overflow: hidden;
-  border: 1px solid rgba(77, 67, 51, 0.1);
-  border-radius: 0.9rem;
-  background: #fbf8f1;
+  border-radius: 0.5rem;
 }
 
 .outfit-board-piece img {
   display: block;
   width: 100%;
   height: 100%;
-  padding: 0.5rem;
+  min-height: 0;
+  padding: 0.15rem;
   object-fit: contain;
 }
 
 .outfit-board-piece figcaption {
-  position: absolute;
-  right: 0.45rem;
-  bottom: 0.4rem;
-  left: 0.45rem;
+  justify-self: center;
   width: fit-content;
-  max-width: calc(100% - 0.9rem);
+  max-width: 100%;
   overflow: hidden;
-  border: 1px solid rgba(77, 67, 51, 0.1);
   border-radius: 999px;
-  background: rgba(251, 248, 241, 0.94);
-  padding: 0.2rem 0.5rem;
+  background: rgba(251, 248, 241, 0.82);
+  padding: 0.12rem 0.32rem;
   color: hsl(var(--foreground));
   font-family: var(--app-font-mono);
-  font-size: 0.55rem;
-  letter-spacing: 0.05em;
+  font-size: 0.48rem;
+  letter-spacing: 0.035em;
   line-height: 1.2;
   text-overflow: ellipsis;
   text-transform: uppercase;
@@ -556,11 +558,6 @@
 
 @media (max-width: 380px) {
   .outfit-board {
-    min-height: 230px;
-    padding: 0.5rem;
-  }
-
-  .outfit-board-with-extras {
-    grid-template-columns: minmax(0, 1fr) minmax(72px, 0.42fr);
+    padding: 0.4rem;
   }
 }

@@ -376,16 +376,14 @@ function OutfitCard({ look, index, isSaved, feedback, onToggleSaved, onFeedback 
   const bottom = look.items.find((item) => item.category === 'bottom');
   const finishingItems = look.items.filter((item) => item.category === 'footwear' || item.category === 'layer' || item.category === 'accessory');
   const renderItem = (item: WardrobeItem, position: string) => (
-    <figure key={item.id} data-testid={`img-outfit-item-${look.id}-${item.id}`} className={`outfit-board-piece outfit-board-${position}`}>
+    <figure key={item.id} data-testid={`img-outfit-item-${look.id}-${item.id}`} className={`outfit-board-piece outfit-board-piece-${position}`}>
       <img src={item.photo} alt={item.name} loading="lazy" />
       <figcaption>{categoryLabel(item.category)}</figcaption>
     </figure>
   );
   return <article data-testid={`card-outfit-${look.id}`} className="group overflow-hidden rounded-[24px] border border-border bg-card shadow-[0_12px_35px_-28px_hsl(214_27%_18%/.7)] transition hover:-translate-y-1 hover:shadow-[0_22px_45px_-28px_hsl(214_27%_18%/.55)] wardrobe-rise" style={{ animationDelay: `${index * 90}ms` }}>
-    <div data-testid={`collage-outfit-${look.id}`} className={`outfit-board ${finishingItems.length ? 'outfit-board-with-extras' : ''}`}>
-      <div className={`outfit-board-core ${onePiece ? 'outfit-board-one-piece' : ''}`}>
-        {onePiece ? renderItem(onePiece, 'one-piece') : <>{top && renderItem(top, 'top')}{bottom && renderItem(bottom, 'bottom')}</>}
-      </div>
+    <div data-testid={`collage-outfit-${look.id}`} className={`outfit-board ${onePiece ? 'outfit-board-one-piece' : ''} ${finishingItems.length ? 'outfit-board-with-extras' : ''}`}>
+      {onePiece ? renderItem(onePiece, 'one-piece') : <>{top && renderItem(top, 'top')}{bottom && renderItem(bottom, 'bottom')}</>}
       {finishingItems.length > 0 && <aside className="outfit-board-extras" aria-label="Optional pieces in this outfit">{finishingItems.map((item) => renderItem(item, item.category))}</aside>}
     </div>
     <div className="p-5"><div className="flex items-start justify-between gap-3"><div><p className="font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">look 0{index + 1}</p><h3 data-testid={`text-outfit-title-${look.id}`} className="mt-1 font-serif text-2xl">{look.title}</h3><p data-testid={`text-outfit-explanation-${look.id}`} className="mt-1 text-xs leading-relaxed text-muted-foreground">{look.note}</p></div><button type="button" data-testid={`button-save-outfit-${look.id}`} aria-label={isSaved ? `Unsave ${look.title}` : `Save ${look.title}`} onClick={onToggleSaved} className={`focus-ring grid size-10 shrink-0 place-items-center rounded-full border transition ${isSaved ? 'border-accent bg-accent text-accent-foreground' : 'border-border text-muted-foreground hover:border-accent hover:text-foreground'}`}><Heart size={17} fill={isSaved ? 'currentColor' : 'none'} /></button></div>
