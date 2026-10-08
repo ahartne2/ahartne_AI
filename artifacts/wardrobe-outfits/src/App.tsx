@@ -189,8 +189,8 @@ function trimBlankMargins(source: string): Promise<string> {
           boxArea < width * height * 0.1
         ) return resolve(source);
 
-        const padX = Math.max(Math.round(width * 0.02), Math.round(boxWidth * 0.14));
-        const padY = Math.max(Math.round(height * 0.02), Math.round(boxHeight * 0.14));
+        const padX = Math.max(Math.round(width * 0.01), Math.round(boxWidth * 0.065));
+        const padY = Math.max(Math.round(height * 0.01), Math.round(boxHeight * 0.065));
         const scaleX = image.naturalWidth / width;
         const scaleY = image.naturalHeight / height;
         const left = Math.max(0, Math.floor((minX - padX) * scaleX));
@@ -508,9 +508,8 @@ function OutfitCard({ look, index, isSaved, feedback, onToggleSaved, onFeedback 
   const bottom = look.items.find((item) => item.category === 'bottom');
   const finishingItems = look.items.filter((item) => item.category === 'footwear' || item.category === 'layer' || item.category === 'accessory');
   const renderItem = (item: WardrobeItem, position: string) => (
-    <figure key={item.id} data-testid={`img-outfit-item-${look.id}-${item.id}`} className={`outfit-board-piece outfit-board-piece-${position}`}>
-      <img src={item.photo} alt={item.name} loading="lazy" />
-      <figcaption>{categoryLabel(item.category)}</figcaption>
+    <figure key={item.id} data-testid={`figure-outfit-item-${look.id}-${item.id}`} className={`outfit-board-piece outfit-board-piece-${position}`}>
+      <BoardPhoto item={item} lookId={look.id} />
     </figure>
   );
   return <article data-testid={`card-outfit-${look.id}`} className="group overflow-hidden rounded-[24px] border border-border bg-card shadow-[0_12px_35px_-28px_hsl(214_27%_18%/.7)] transition hover:-translate-y-1 hover:shadow-[0_22px_45px_-28px_hsl(214_27%_18%/.55)] wardrobe-rise" style={{ animationDelay: `${index * 90}ms` }}>
