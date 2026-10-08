@@ -107,6 +107,138 @@ function compressPhoto(file: File): Promise<string> {
   });
 }
 
+const boardPhotoCache = new Map<string, Promise<string>>();
+
+function trimBlankMargins(source: string): Promise<string> {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onerror = () => resolve(source);
+    image.onload = () => {
+      try {
+        const scale = Math.min(1, 220 / Math.max(image.naturalWidth, image.naturalHeight));
+        const width = Math.max(1, Math.round(image.naturalWidth * scale));
+        const height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const analysis = document.createElement('canvas');
+        analysis.width = width;
+        analysis.height = height;
+        const context = analysis.getContext('2d', { willReadFrequently: true });
+        if (!context) return resolve(source);
+        context.drawImage(image, 0, 0, width, height);
+        const pixels = context.getImageData(0, 0, width, height).data;
+        const patch = Math.max(2, Math.round(Math.min(width, height) * 0.025));
+        const sampleCorner = (left: number, top: number) => {
+          let red = 0;
+          let green = 0;
+          let blue = 0;
+          let count = 0;
+          for (let y = top; y < Math.min(height, top + patch); y += 1) {
+            for (let x = left; x < Math.min(width, left + patch); x += 1) {
+              const offset = (y * width + x) * 4;
+              red += pixels[offset];
+              green += pixels[offset + 1];
+              blue += pixels[offset + 2];
+              count += 1;
+            }
+          }
+          return [red / count, green / count, blue / count];
+        };
+        const corners = [
+          sampleCorner(0, 0),
+          sampleCorner(width - patch, 0),
+          sampleCorner(0, height - patch),
+          sampleCorner(width - patch, height - patch),
+        ];
+        const background = [0, 1, 2].map((channel) =>
+          corners.reduce((sum, color) => sum + color[channel], 0) / corners.length,
+        );
+        const spread = [0, 1, 2].map((channel) =>
+          Math.max(...corners.map((color) => color[channel])) - Math.min(...corners.map((color) => color[channel])),
+        );
+        if (Math.max(...spread) > 34) return resolve(source);
+
+        let minX = width;
+        let minY = height;
+        let maxX = -1;
+        let maxY = -1;
+        let foregroundPixels = 0;
+        for (let y = 0; y < height; y += 1) {
+          for (let x = 0; x < width; x += 1) {
+            const offset = (y * width + x) * 4;
+            const alpha = pixels[offset + 3];
+            const difference = Math.max(
+              Math.abs(pixels[offset] - background[0]),
+              Math.abs(pixels[offset + 1] - background[1]),
+              Math.abs(pixels[offset + 2] - background[2]),
+            );
+            if (alpha > 12 && difference > 28) {
+              foregroundPixels += 1;
+              minX = Math.min(minX, x);
+              minY = Math.min(minY, y);
+              maxX = Math.max(maxX, x);
+              maxY = Math.max(maxY, y);
+            }
+          }
+        }
+        const boxWidth = maxX - minX + 1;
+        const boxHeight = maxY - minY + 1;
+        const boxArea = boxWidth * boxHeight;
+        if (
+          foregroundPixels < width * height * 0.035 ||
+          boxWidth < width * 0.18 ||
+          boxHeight < height * 0.22 ||
+          boxArea < width * height * 0.1
+        ) return resolve(source);
+
+        const padX = Math.max(Math.round(width * 0.02), Math.round(boxWidth * 0.14));
+        const padY = Math.max(Math.round(height * 0.02), Math.round(boxHeight * 0.14));
+        const scaleX = image.naturalWidth / width;
+        const scaleY = image.naturalHeight / height;
+        const left = Math.max(0, Math.floor((minX - padX) * scaleX));
+        const top = Math.max(0, Math.floor((minY - padY) * scaleY));
+        const right = Math.min(image.naturalWidth, Math.ceil((maxX + 1 + padX) * scaleX));
+        const bottom = Math.min(image.naturalHeight, Math.ceil((maxY + 1 + padY) * scaleY));
+        const cropWidth = right - left;
+        const cropHeight = bottom - top;
+        if (cropWidth >= image.naturalWidth * 0.96 && cropHeight >= image.naturalHeight * 0.96) return resolve(source);
+
+        const cropped = document.createElement('canvas');
+        cropped.width = cropWidth;
+        cropped.height = cropHeight;
+        const cropContext = cropped.getContext('2d');
+        if (!cropContext) return resolve(source);
+        cropContext.drawImage(image, left, top, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+        resolve(cropped.toDataURL('image/jpeg', 0.92));
+      } catch {
+        resolve(source);
+      }
+    };
+    image.src = source;
+  });
+}
+
+function getBoardPhoto(source: string): Promise<string> {
+  let cached = boardPhotoCache.get(source);
+  if (!cached) {
+    if (boardPhotoCache.size >= 24) boardPhotoCache.clear();
+    cached = trimBlankMargins(source);
+    boardPhotoCache.set(source, cached);
+  }
+  return cached;
+}
+
+function BoardPhoto({ item, lookId }: { item: WardrobeItem; lookId: string }) {
+  const [displayPhoto, setDisplayPhoto] = useState(item.photo);
+  useEffect(() => {
+    let current = true;
+    setDisplayPhoto(item.photo);
+    getBoardPhoto(item.photo).then((photo) => {
+      if (current) setDisplayPhoto(photo);
+    });
+    return () => { current = false; };
+  }, [item.photo]);
+  return <img data-testid={`img-outfit-item-${lookId}-${item.id}`} src={displayPhoto} alt={item.name} />;
+}
+
 function categoryLabel(category: Category) {
   return categories.find((item) => item.value === category)?.label || category;
 }
