@@ -121,29 +121,57 @@ function buildOutfits(items: WardrobeItem[]) {
   const tops = items.filter((item) => item.category === 'top');
   const bottoms = items.filter((item) => item.category === 'bottom');
   const footwear = items.filter((item) => item.category === 'footwear');
-  const layers = items.filter((item) => item.category === 'layer' || item.category === 'accessory');
-  if (!tops.length || !bottoms.length || !footwear.length) return [];
+  const onePieces = items.filter((item) => item.category === 'one-piece');
+  const finishingPieces = items.filter((item) => item.category === 'layer' || item.category === 'accessory');
+  const bases: WardrobeItem[][] = [];
+  tops.forEach((top) => {
+    bottoms.forEach((bottom) => bases.push([top, bottom]));
+  });
+  onePieces.forEach((item) => bases.push([item]));
+  if (!bases.length) return [];
+
+  const shoeOptions: Array<WardrobeItem | undefined> = footwear.length ? footwear : [undefined];
+  const finishingOptions: Array<WardrobeItem | undefined> = finishingPieces.length ? finishingPieces : [undefined];
   const candidates: WardrobeItem[][] = [];
-  for (let t = 0; t < tops.length; t += 1) {
-    for (let b = 0; b < bottoms.length; b += 1) {
-      for (let f = 0; f < footwear.length; f += 1) {
-        const optional = layers.length ? [layers[(t + b + f) % layers.length]] : [];
-        candidates.push([tops[t], bottoms[b], footwear[f], ...optional]);
-      }
-    }
-  }
+  bases.forEach((base) => {
+    shoeOptions.forEach((shoe) => {
+      finishingOptions.forEach((finishingPiece) => {
+        candidates.push([
+          ...base,
+          ...(shoe ? [shoe] : []),
+          ...(finishingPiece ? [finishingPiece] : []),
+        ]);
+      });
+    });
+  });
+
   const picked: WardrobeItem[][] = [];
+  const signatures = new Set<string>();
   candidates.forEach((candidate) => {
     if (picked.length >= 3) return;
     const signature = candidate.map((item) => item.id).sort().join('|');
-    if (!picked.some((look) => look.map((item) => item.id).sort().join('|') === signature)) picked.push(candidate);
+    if (!signatures.has(signature)) {
+      signatures.add(signature);
+      picked.push(candidate);
+    }
   });
-  return picked.map((itemsInLook, index) => ({
-    id: `look-${index + 1}`,
-    title: ['Easy start', 'A little brighter', 'The reliable remix'][index],
-    note: ['A clean base for wherever the day goes.', 'One small switch, a different mood.', 'Familiar pieces, newly put together.'][index],
-    items: itemsInLook,
-  }));
+  const titles = ['Easy day out', 'A little remix', 'The laid-back one'];
+  return picked.map((itemsInLook, index) => {
+    const hasOnePiece = itemsInLook.some((item) => item.category === 'one-piece');
+    const finishers = [
+      ...(itemsInLook.some((item) => item.category === 'footwear') ? ['your saved shoes'] : []),
+      ...(itemsInLook.some((item) => item.category === 'layer') ? ['your uploaded outerwear'] : []),
+      ...(itemsInLook.some((item) => item.category === 'accessory') ? ['your uploaded accessory'] : []),
+    ];
+    const finishText = finishers.length ? `, finished with ${finishers.join(' and ')}` : ', kept simple with the pieces you saved';
+    const note = `${hasOnePiece ? 'An easy one-piece base' : 'A relaxed top-and-bottom pairing'}${finishText}.`;
+    return {
+      id: `look-${itemsInLook.map((item) => item.id).sort().join('--')}`,
+      title: titles[index],
+      note,
+      items: itemsInLook,
+    };
+  });
 }
 
 function App() {
@@ -290,7 +318,6 @@ function LoadingState() {
 type Look = ReturnType<typeof buildOutfits>[number];
 function OutfitView({ items, outfits, saved, feedback, onToggleSaved, onFeedback, onAdd, onReview }: { items: WardrobeItem[]; outfits: Look[]; saved: string[]; feedback: Record<string, Feedback>; onToggleSaved: (id: string) => void; onFeedback: (id: string, feedback: Feedback) => void; onAdd: () => void; onReview: () => void }) {
   const counts = categories.map((category) => ({ ...category, count: items.filter((item) => item.category === category.value).length })).filter((category) => category.count);
-  const hasBasics = ['top', 'bottom', 'footwear'].every((category) => items.some((item) => item.category === category));
   return <div className="space-y-10">
     <section className="wardrobe-rise rounded-[28px] border border-border bg-card p-6 shadow-[0_18px_50px_-35px_hsl(214_27%_18%/.45)] sm:p-8">
       <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
@@ -300,8 +327,8 @@ function OutfitView({ items, outfits, saved, feedback, onToggleSaved, onFeedback
       <div className="mt-7 flex flex-wrap items-center gap-2 border-t border-border/70 pt-5">{counts.length ? counts.map((item) => <span key={item.value} data-testid={`badge-category-${item.value}`} className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs text-secondary-foreground"><IconForCategory category={item.value} />{item.count} {item.short}</span>) : <span className="text-xs text-muted-foreground">Your closet is waiting for its first piece.</span>}<span className="ml-auto font-mono text-[10px] uppercase tracking-[.13em] text-muted-foreground">{items.length}/{MAX_ITEMS} pieces</span></div>
     </section>
 
-    {!hasBasics ? <NeedMoreState items={items} onAdd={onAdd} /> : outfits.length < 3 ? <NeedMoreState items={items} onAdd={onAdd} limited /> : <section aria-label="Curated outfit ideas">
-      <div className="mb-5 flex items-end justify-between"><div><p className="font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">the edit</p><h2 className="mt-1 font-serif text-3xl">Three ways to go.</h2></div><span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex"><CircleHelp size={15} /> Built from your closet</span></div>
+    {outfits.length < 3 ? <NeedMoreState items={items} onAdd={onAdd} limited={outfits.length > 0} /> : <section aria-label="Curated outfit ideas">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">the edit</p><h2 className="mt-1 font-serif text-3xl">Three ways to go.</h2><p data-testid="text-prototype-label" className="mt-2 inline-flex rounded-full bg-accent/40 px-3 py-1.5 text-xs font-semibold text-foreground">Prototype suggestions — AI styling is simulated.</p></div><span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex"><CircleHelp size={15} /> Built from your closet</span></div>
       <div className="grid gap-5 lg:grid-cols-3">{outfits.map((outfit, index) => <OutfitCard key={outfit.id} look={outfit} index={index} isSaved={saved.includes(outfit.id)} feedback={feedback[outfit.id] || { verdict: '', reason: '' }} onToggleSaved={() => onToggleSaved(outfit.id)} onFeedback={(value) => onFeedback(outfit.id, value)} />)}</div>
     </section>}
 
@@ -311,30 +338,67 @@ function OutfitView({ items, outfits, saved, feedback, onToggleSaved, onFeedback
 }
 
 function NeedMoreState({ items, onAdd, limited = false }: { items: WardrobeItem[]; onAdd: () => void; limited?: boolean }) {
-  const missing = ['top', 'bottom', 'footwear'].filter((category) => !items.some((item) => item.category === category)).map((category) => categoryLabel(category as Category).toLowerCase());
-  const variety = limited ? 'one more different top, bottom, or pair of footwear' : missing.join(', ');
-  return <section data-testid="state-needs-more" className="overflow-hidden rounded-[28px] border border-dashed border-border bg-secondary/45 p-7 sm:p-10"><div className="grid gap-8 md:grid-cols-[1fr_auto] md:items-center"><div><span className="mb-4 inline-flex size-11 items-center justify-center rounded-2xl bg-accent text-accent-foreground"><Sparkles size={20} /></span><h2 className="font-serif text-3xl">{limited ? 'Almost enough for a proper edit.' : 'Let’s start with the essentials.'}</h2><p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">{limited ? <>Three truly different looks need {variety}. Add a little variety and the edit will appear — no filler looks, ever.</> : <>Add a top, bottom, and footwear to make a complete day-out look. You choose every label; Wardrobe never guesses what is in a photo.</>}</p><button type="button" data-testid="button-add-first-piece" onClick={onAdd} className="focus-ring mt-6 inline-flex min-h-12 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground transition hover:-translate-y-0.5"><Plus size={17} /> Add a piece</button></div><div className="relative mx-auto flex size-44 items-center justify-center rounded-full border border-border bg-card md:mr-10"><div className="absolute inset-5 rounded-full border border-dashed border-border" /><Shirt size={45} strokeWidth={1.2} className="text-primary/70" /></div></div></section>;
+  const hasTop = items.some((item) => item.category === 'top');
+  const hasBottom = items.some((item) => item.category === 'bottom');
+  const hasOnePiece = items.some((item) => item.category === 'one-piece');
+  const missing: string[] = [];
+  if (!hasTop && !hasOnePiece) missing.push('a top');
+  if (!hasBottom && !hasOnePiece) missing.push('a bottom');
+  const hasBase = hasOnePiece || (hasTop && hasBottom);
+  const title = limited ? 'Almost enough for a proper edit.' : hasBase ? 'A little more variety will help.' : 'Let’s start with the essentials.';
+  const description = limited
+    ? 'Three distinct looks need more variety in your top, bottom, one-piece, footwear, or layer/accessory categories. Add another piece to make a new combination. Only uploaded pieces are ever shown.'
+    : hasBase
+      ? 'Your closet has a complete base, but not enough different combinations yet. Add another piece in a top, bottom, one-piece, footwear, or layer/accessory category. We’ll only use items you add.'
+      : `Add ${missing.length ? missing.join(' and ') : 'a top and bottom, or a one-piece'} to create a complete base. Footwear, outerwear, and accessories are optional; they appear only if you add them.`;
+  return <section data-testid="state-needs-more" className="overflow-hidden rounded-[28px] border border-dashed border-border bg-secondary/45 p-7 sm:p-10"><div className="grid gap-8 md:grid-cols-[1fr_auto] md:items-center"><div><span className="mb-4 inline-flex size-11 items-center justify-center rounded-2xl bg-accent text-accent-foreground"><Sparkles size={20} /></span><h2 className="font-serif text-3xl">{title}</h2><p data-testid="text-missing-category" className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">{description}</p><button type="button" data-testid="button-add-first-piece" onClick={onAdd} className="focus-ring mt-6 inline-flex min-h-12 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground transition hover:-translate-y-0.5"><Plus size={17} /> Add a piece</button></div><div className="relative mx-auto flex size-44 items-center justify-center rounded-full border border-border bg-card md:mr-10"><div className="absolute inset-5 rounded-full border border-dashed border-border" /><Shirt size={45} strokeWidth={1.2} className="text-primary/70" /></div></div></section>;
 }
 
 function OutfitCard({ look, index, isSaved, feedback, onToggleSaved, onFeedback }: { look: Look; index: number; isSaved: boolean; feedback: Feedback; onToggleSaved: () => void; onFeedback: (feedback: Feedback) => void }) {
   const [reason, setReason] = useState(feedback.reason);
+  const [reasonError, setReasonError] = useState('');
   useEffect(() => setReason(feedback.reason), [feedback.reason]);
-  const submitReason = (event: FormEvent) => { event.preventDefault(); onFeedback({ ...feedback, reason }); };
+  const submitReason = (event: FormEvent) => {
+    event.preventDefault();
+    if (!feedback.verdict) {
+      setReasonError('Choose “Would wear” or “Wouldn’t wear” first.');
+      return;
+    }
+    if (!reason.trim()) {
+      setReasonError('Add a short reason for your choice.');
+      return;
+    }
+    setReasonError('');
+    onFeedback({ ...feedback, reason: reason.trim() });
+  };
+  const onePiece = look.items.find((item) => item.category === 'one-piece');
+  const top = look.items.find((item) => item.category === 'top');
+  const bottom = look.items.find((item) => item.category === 'bottom');
+  const finishingItems = look.items.filter((item) => item.category === 'footwear' || item.category === 'layer' || item.category === 'accessory');
+  const renderItem = (item: WardrobeItem, position: string) => (
+    <figure key={item.id} data-testid={`img-outfit-item-${look.id}-${item.id}`} className={`outfit-board-piece outfit-board-${position}`}>
+      <img src={item.photo} alt={item.name} loading="lazy" />
+      <figcaption>{categoryLabel(item.category)}</figcaption>
+    </figure>
+  );
   return <article data-testid={`card-outfit-${look.id}`} className="group overflow-hidden rounded-[24px] border border-border bg-card shadow-[0_12px_35px_-28px_hsl(214_27%_18%/.7)] transition hover:-translate-y-1 hover:shadow-[0_22px_45px_-28px_hsl(214_27%_18%/.55)] wardrobe-rise" style={{ animationDelay: `${index * 90}ms` }}>
-    <div className="relative grid h-[260px] grid-cols-2 gap-1 overflow-hidden bg-secondary p-1">
-      {look.items.map((item, itemIndex) => <div key={item.id} data-testid={`img-outfit-item-${look.id}-${item.id}`} className={`relative overflow-hidden ${itemIndex === 0 && look.items.length === 3 ? 'row-span-2' : ''} ${look.items.length === 3 && itemIndex === 0 ? '' : ''}`}><img src={item.photo} alt={item.name} className="size-full object-cover transition duration-500 group-hover:scale-[1.03]" /><span className="absolute bottom-2 left-2 rounded-full bg-card/90 px-2 py-1 font-mono text-[9px] uppercase tracking-wide text-foreground">{categoryLabel(item.category)}</span></div>)}
+    <div data-testid={`collage-outfit-${look.id}`} className={`outfit-board ${finishingItems.length ? 'outfit-board-with-extras' : ''}`}>
+      <div className={`outfit-board-core ${onePiece ? 'outfit-board-one-piece' : ''}`}>
+        {onePiece ? renderItem(onePiece, 'one-piece') : <>{top && renderItem(top, 'top')}{bottom && renderItem(bottom, 'bottom')}</>}
+      </div>
+      {finishingItems.length > 0 && <aside className="outfit-board-extras" aria-label="Optional pieces in this outfit">{finishingItems.map((item) => renderItem(item, item.category))}</aside>}
     </div>
-    <div className="p-5"><div className="flex items-start justify-between gap-3"><div><p className="font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">look 0{index + 1}</p><h3 data-testid={`text-outfit-title-${look.id}`} className="mt-1 font-serif text-2xl">{look.title}</h3><p className="mt-1 text-xs text-muted-foreground">{look.note}</p></div><button type="button" data-testid={`button-save-outfit-${look.id}`} aria-label={isSaved ? `Unsave ${look.title}` : `Save ${look.title}`} onClick={onToggleSaved} className={`focus-ring grid size-10 shrink-0 place-items-center rounded-full border transition ${isSaved ? 'border-accent bg-accent text-accent-foreground' : 'border-border text-muted-foreground hover:border-accent hover:text-foreground'}`}><Heart size={17} fill={isSaved ? 'currentColor' : 'none'} /></button></div>
+    <div className="p-5"><div className="flex items-start justify-between gap-3"><div><p className="font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">look 0{index + 1}</p><h3 data-testid={`text-outfit-title-${look.id}`} className="mt-1 font-serif text-2xl">{look.title}</h3><p data-testid={`text-outfit-explanation-${look.id}`} className="mt-1 text-xs leading-relaxed text-muted-foreground">{look.note}</p></div><button type="button" data-testid={`button-save-outfit-${look.id}`} aria-label={isSaved ? `Unsave ${look.title}` : `Save ${look.title}`} onClick={onToggleSaved} className={`focus-ring grid size-10 shrink-0 place-items-center rounded-full border transition ${isSaved ? 'border-accent bg-accent text-accent-foreground' : 'border-border text-muted-foreground hover:border-accent hover:text-foreground'}`}><Heart size={17} fill={isSaved ? 'currentColor' : 'none'} /></button></div>
       <div className="mt-5 space-y-2 border-t border-border/70 pt-4">{look.items.map((item) => <div key={item.id} className="flex items-center justify-between text-xs"><span className="font-medium">{item.name}</span><span className="text-muted-foreground">{categoryLabel(item.category)}</span></div>)}</div>
-      <div className="mt-5 rounded-2xl bg-muted/70 p-3.5"><div className="mb-3 flex items-center gap-2 text-xs font-semibold"><MessageCircle size={15} className="text-primary/70" /> Your take</div><div className="grid grid-cols-2 gap-2"><button type="button" data-testid={`button-would-wear-${look.id}`} onClick={() => onFeedback({ ...feedback, verdict: 'would' })} className={`focus-ring min-h-10 rounded-xl border text-xs font-semibold transition ${feedback.verdict === 'would' ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card hover:bg-secondary'}`}><Check size={14} className="mr-1 inline" /> Would wear</button><button type="button" data-testid={`button-wouldnt-wear-${look.id}`} onClick={() => onFeedback({ ...feedback, verdict: 'wouldnt' })} className={`focus-ring min-h-10 rounded-xl border text-xs font-semibold transition ${feedback.verdict === 'wouldnt' ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card hover:bg-secondary'}`}><X size={14} className="mr-1 inline" /> Wouldn’t wear</button></div><form onSubmit={submitReason} className="mt-2 flex gap-2"><label htmlFor={`reason-${look.id}`} className="sr-only">Reason for your choice</label><input id={`reason-${look.id}`} data-testid={`input-reason-${look.id}`} value={reason} onChange={(event) => setReason(event.target.value)} maxLength={120} placeholder="A quick reason (optional)" className="focus-ring min-w-0 flex-1 rounded-xl border border-border bg-card px-3 text-xs outline-none placeholder:text-muted-foreground/70" /><button type="submit" data-testid={`button-save-feedback-${look.id}`} className="focus-ring grid size-10 shrink-0 place-items-center rounded-xl bg-card text-primary transition hover:bg-secondary" aria-label="Save reason"><Save size={15} /></button></form></div>
+      <div className="mt-5 rounded-2xl bg-muted/70 p-3.5"><div className="mb-3 flex items-center gap-2 text-xs font-semibold"><MessageCircle size={15} className="text-primary/70" /> Your take</div><div className="grid grid-cols-2 gap-2"><button type="button" data-testid={`button-would-wear-${look.id}`} onClick={() => { setReasonError(''); onFeedback({ ...feedback, verdict: 'would' }); }} className={`focus-ring min-h-10 rounded-xl border text-xs font-semibold transition ${feedback.verdict === 'would' ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card hover:bg-secondary'}`}><Check size={14} className="mr-1 inline" /> Would wear</button><button type="button" data-testid={`button-wouldnt-wear-${look.id}`} onClick={() => { setReasonError(''); onFeedback({ ...feedback, verdict: 'wouldnt' }); }} className={`focus-ring min-h-10 rounded-xl border text-xs font-semibold transition ${feedback.verdict === 'wouldnt' ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card hover:bg-secondary'}`}><X size={14} className="mr-1 inline" /> Wouldn’t wear</button></div><form onSubmit={submitReason} className="mt-2 flex gap-2"><label htmlFor={`reason-${look.id}`} className="sr-only">Short reason for your choice</label><input id={`reason-${look.id}`} data-testid={`input-reason-${look.id}`} value={reason} onChange={(event) => { setReason(event.target.value); setReasonError(''); }} maxLength={120} placeholder="Add a short reason" aria-invalid={Boolean(reasonError)} className="focus-ring min-w-0 flex-1 rounded-xl border border-border bg-card px-3 text-xs outline-none placeholder:text-muted-foreground/70" /><button type="submit" data-testid={`button-save-feedback-${look.id}`} className="focus-ring grid size-10 shrink-0 place-items-center rounded-xl bg-card text-primary transition hover:bg-secondary" aria-label="Save your response"><Save size={15} /></button></form>{reasonError && <p role="alert" data-testid={`status-feedback-error-${look.id}`} className="mt-2 text-xs text-destructive">{reasonError}</p>}</div>
     </div>
   </article>;
 }
 
 function WardrobeView({ items, onAdd, onEdit, onRemove, onBack }: { items: WardrobeItem[]; onAdd: () => void; onEdit: (id: string) => void; onRemove: (id: string) => void; onBack: () => void }) {
-  return <div className="space-y-7 wardrobe-rise"><div className="flex flex-col justify-between gap-5 rounded-[28px] border border-border bg-card p-6 sm:flex-row sm:items-center sm:p-8"><div><p className="mb-2 font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">your pieces stay yours</p><h2 className="font-serif text-3xl">A closet with a point of view.</h2><p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">Add a photo, give it a name, choose a category. Everything is saved privately in this browser.</p></div><button type="button" data-testid="button-add-piece" onClick={onAdd} disabled={items.length >= MAX_ITEMS} className="focus-ring inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45"><Plus size={17} /> {items.length >= MAX_ITEMS ? 'Wardrobe complete' : 'Add a piece'}</button></div>
+  return <div className="space-y-7 wardrobe-rise"><div className="flex flex-col justify-between gap-5 rounded-[28px] border border-border bg-card p-6 sm:flex-row sm:items-center sm:p-8"><div><p className="mb-2 font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">your pieces stay yours</p><h2 className="font-serif text-3xl">A closet with a point of view.</h2><p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">Add a photo, give it a name, choose a category. Everything is saved privately in this browser.</p></div><div className="flex flex-col gap-2 sm:flex-row"><button type="button" data-testid="button-suggestions-from-wardrobe" onClick={onBack} className="focus-ring inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-full border border-primary px-5 text-sm font-semibold text-primary transition hover:bg-secondary"><Sparkles size={16} /> Outfit suggestions</button><button type="button" data-testid="button-add-piece" onClick={onAdd} disabled={items.length >= MAX_ITEMS} className="focus-ring inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45"><Plus size={17} /> {items.length >= MAX_ITEMS ? 'Wardrobe complete' : 'Add a piece'}</button></div></div>
     {items.length === 0 ? <div data-testid="state-empty-wardrobe" className="rounded-[28px] border border-dashed border-border p-10 text-center"><div className="mx-auto grid size-14 place-items-center rounded-2xl bg-secondary text-primary"><Camera size={24} /></div><h3 className="mt-5 font-serif text-2xl">The first hanger is yours.</h3><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">One photo at a time, build the little wardrobe you actually reach for.</p><button type="button" data-testid="button-add-empty-piece" onClick={onAdd} className="focus-ring mt-5 inline-flex min-h-11 items-center gap-2 rounded-full border border-primary px-4 text-sm font-semibold text-primary"><Plus size={16} /> Add your first piece</button></div> : <div data-testid="grid-wardrobe" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{items.map((item) => <div key={item.id} data-testid={`card-wardrobe-item-${item.id}`} className="group overflow-hidden rounded-[20px] border border-border bg-card"><div className="photo-checker relative aspect-[.82] overflow-hidden"><img src={item.photo} alt={item.name} className="size-full object-cover transition duration-500 group-hover:scale-105" /><div className="absolute inset-x-2 bottom-2 flex justify-between gap-1 opacity-100 sm:opacity-0 sm:transition sm:group-hover:opacity-100"><button type="button" data-testid={`button-edit-item-${item.id}`} onClick={() => onEdit(item.id)} className="focus-ring inline-flex min-h-9 items-center gap-1 rounded-full bg-card/95 px-3 text-[11px] font-semibold shadow-sm"><Edit3 size={13} /> Edit</button><button type="button" data-testid={`button-remove-item-${item.id}`} onClick={() => onRemove(item.id)} className="focus-ring grid size-9 place-items-center rounded-full bg-card/95 text-destructive shadow-sm" aria-label={`Remove ${item.name}`}><Trash2 size={14} /></button></div></div><div className="p-3"><p className="truncate text-sm font-semibold">{item.name}</p><p className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground"><IconForCategory category={item.category} />{categoryLabel(item.category)}</p></div></div>)}</div>}
-    <div className="flex items-center justify-between border-t border-border/70 pt-5"><p className="font-mono text-[10px] uppercase tracking-[.15em] text-muted-foreground">{items.length} of {MAX_ITEMS} pieces saved locally</p><button type="button" data-testid="button-back-to-edit" onClick={onBack} className="focus-ring inline-flex items-center gap-2 text-sm font-semibold text-primary">Back to today’s edit <ArrowRight size={15} /></button></div>
+    <div className="flex items-center justify-between border-t border-border/70 pt-5"><p className="font-mono text-[10px] uppercase tracking-[.15em] text-muted-foreground">{items.length} of {MAX_ITEMS} pieces saved locally</p><button type="button" data-testid="button-back-to-edit" onClick={onBack} className="focus-ring inline-flex items-center gap-2 text-sm font-semibold text-primary">See outfit suggestions <ArrowRight size={15} /></button></div>
   </div>;
 }
 
