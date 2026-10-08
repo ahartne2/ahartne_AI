@@ -314,6 +314,7 @@ function App() {
           <RoutedErrorBoundary>
             <Switch>
               <Route path="/" component={WardrobeHome} />
+              <Route path="/__board-layout-check" component={BoardLayoutCheck} />
               <Route component={NotFound} />
             </Switch>
           </RoutedErrorBoundary>
@@ -522,6 +523,46 @@ function OutfitCard({ look, index, isSaved, feedback, onToggleSaved, onFeedback 
       <div className="mt-5 rounded-2xl bg-muted/70 p-3.5"><div className="mb-3 flex items-center gap-2 text-xs font-semibold"><MessageCircle size={15} className="text-primary/70" /> Your take</div><div className="grid grid-cols-2 gap-2"><button type="button" data-testid={`button-would-wear-${look.id}`} onClick={() => { setReasonError(''); onFeedback({ ...feedback, verdict: 'would' }); }} className={`focus-ring min-h-10 rounded-xl border text-xs font-semibold transition ${feedback.verdict === 'would' ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card hover:bg-secondary'}`}><Check size={14} className="mr-1 inline" /> Would wear</button><button type="button" data-testid={`button-wouldnt-wear-${look.id}`} onClick={() => { setReasonError(''); onFeedback({ ...feedback, verdict: 'wouldnt' }); }} className={`focus-ring min-h-10 rounded-xl border text-xs font-semibold transition ${feedback.verdict === 'wouldnt' ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card hover:bg-secondary'}`}><X size={14} className="mr-1 inline" /> Wouldn’t wear</button></div><form onSubmit={submitReason} className="mt-2 flex gap-2"><label htmlFor={`reason-${look.id}`} className="sr-only">Short reason for your choice</label><input id={`reason-${look.id}`} data-testid={`input-reason-${look.id}`} value={reason} onChange={(event) => { setReason(event.target.value); setReasonError(''); }} maxLength={120} placeholder="Add a short reason" aria-invalid={Boolean(reasonError)} className="focus-ring min-w-0 flex-1 rounded-xl border border-border bg-card px-3 text-xs outline-none placeholder:text-muted-foreground/70" /><button type="submit" data-testid={`button-save-feedback-${look.id}`} className="focus-ring grid size-10 shrink-0 place-items-center rounded-xl bg-card text-primary transition hover:bg-secondary" aria-label="Save your response"><Save size={15} /></button></form>{reasonError && <p role="alert" data-testid={`status-feedback-error-${look.id}`} className="mt-2 text-xs text-destructive">{reasonError}</p>}</div>
     </div>
   </article>;
+}
+
+function BoardLayoutCheck() {
+  const svgPhoto = (svg: string) => `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  const items: WardrobeItem[] = [
+    {
+      id: 'check-shirt',
+      name: 'Soft blue shirt',
+      category: 'top',
+      createdAt: 0,
+      photo: svgPhoto('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="400" viewBox="0 0 320 400"><rect width="320" height="400" fill="white"/><path fill="#83A8B5" d="M112 82 145 65l15 25 15-25 34 17 38 34-24 54-31-16v165H128V154l-32 16-24-54z"/><path fill="#F3F5F4" d="m145 65 15 25 15-25-15 8z"/><path stroke="#648895" stroke-width="4" d="M160 95v215"/></svg>'),
+    },
+    {
+      id: 'check-trousers',
+      name: 'Relaxed navy trousers',
+      category: 'bottom',
+      createdAt: 0,
+      photo: svgPhoto('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="400" viewBox="0 0 320 400"><rect width="320" height="400" fill="white"/><path fill="#35485C" d="M91 54h138l-10 105 27 188-76 5-10-147-11 147-76-5 28-188z"/><path fill="none" stroke="#536578" stroke-width="4" d="M160 61v143"/></svg>'),
+    },
+    {
+      id: 'check-shoes',
+      name: 'White trainers',
+      category: 'footwear',
+      createdAt: 0,
+      photo: svgPhoto('<svg xmlns="http://www.w3.org/2000/svg" width="360" height="180" viewBox="0 0 360 180"><rect width="360" height="180" fill="white"/><path fill="#E9E4D9" stroke="#A89F91" stroke-width="5" d="M37 90 95 82l34-43 35 58 61 25q25 10 27 29H37zM195 94l47-7 32-36 32 45 33 19q16 8 16 24H195z"/><path fill="none" stroke="#A89F91" stroke-width="4" d="M52 140h185m-30 0h148"/></svg>'),
+    },
+  ];
+  const look: Look = {
+    id: 'layout-check',
+    title: 'Easy day out',
+    note: 'A relaxed top-and-bottom pairing, finished with your saved shoes.',
+    items,
+  };
+
+  return <main className="min-h-screen bg-background px-4 py-5 sm:px-8">
+    <div className="mx-auto max-w-[360px]">
+      <p className="mb-3 font-mono text-xs uppercase tracking-[.15em] text-muted-foreground">temporary board layout check</p>
+      <OutfitCard look={look} index={0} isSaved={false} feedback={{ verdict: '', reason: '' }} onToggleSaved={() => {}} onFeedback={() => {}} />
+    </div>
+  </main>;
 }
 
 function WardrobeView({ items, onAdd, onEdit, onRemove, onBack }: { items: WardrobeItem[]; onAdd: () => void; onEdit: (id: string) => void; onRemove: (id: string) => void; onBack: () => void }) {
