@@ -42,6 +42,18 @@ PORT=21073 BASE_PATH=/ pnpm --filter @workspace/wardrobe-outfits run build
 ```
 The production build is written to `artifacts/wardrobe-outfits/dist/public/`.
 
+## Revisions and evaluation
+
+- [Representative prompts and revisions](ai-use-disclosure.md#representative-prompts-and-revisions)
+- [Human judgment and corrections](ai-use-disclosure.md#human-judgment-and-corrections)
+- [Verification and unresolved work](ai-use-disclosure.md#verification-and-unresolved-work)
+
+The supplied disclosure reports five **functional code checks**, not a full browser test suite. Its reported Office fallback and accessory-suitability limitations remain documented. The reported HTTP 200/page-title check establishes page access only, not interactive correctness. Full browser persistence, mobile interaction, actual response-time measurements, final video access, and clothing-cutout fidelity still require the checks described in that document. This documentation-only repository update does not add new test results or resolve those limitations.
+
+## AI-Use Disclosure
+
+Read the [AI-use disclosure](ai-use-disclosure.md), including [tools and contributions](ai-use-disclosure.md#tools-and-contributions) and [AI inside the product](ai-use-disclosure.md#ai-inside-the-product). It distinguishes AI assistance used to develop the prototype from its current deterministic, simulated styling logic.
+
 ## Three Quick Tests — October 8, 2026
 
 These results and limitations document the earlier prototype tested on the date above. The final features are described in “What it does,” and the public demo link is provided at the top of this README.
