@@ -3,6 +3,12 @@ export type ClosetItem = { id: string; name: string; category: ClosetCategory; p
 export type StyleVibe = 'Office / Work' | 'Gym' | 'Day Off' | 'Comfy';
 export type Outfit = { id: string; title: string; note: string; vibe: StyleVibe; items: ClosetItem[] };
 
+export function isWorkShirtName(name: string) {
+  const normalized = name.toLowerCase();
+  return /collar|blouse|button.?up|button.?down|polo/.test(normalized)
+    || (/shirt/.test(normalized) && !/t[\s-]?shirt/.test(normalized));
+}
+
 const uploadedPieces: Array<[string, string, ClosetCategory, string]> = [
   ['uploaded-01-charcoal-hoodie', 'Charcoal hoodie', 'top', 'charcoal-hoodie.png'],
   ['uploaded-02-charcoal-sweatpants', 'Charcoal sweatpants', 'bottom', 'charcoal-sweatpants.png'],
@@ -24,6 +30,7 @@ const uploadedPieces: Array<[string, string, ClosetCategory, string]> = [
   ['uploaded-18-striped-yellow-long-sleeve', 'Striped yellow logo long-sleeve', 'top', 'striped-yellow-logo-long-sleeve.png'],
   ['uploaded-19-navy-suede-clogs', 'Navy suede Boston clogs', 'footwear', 'navy-suede-boston-clogs.png'],
   ['uploaded-20-burgundy-leather-belt', 'Burgundy leather belt', 'accessory', 'burgundy-leather-belt.png'],
+  ['uploaded-21-brown-leather-loafers', 'Brown leather loafers', 'footwear', 'brown-leather-loafers.png'],
 ];
 
 export function createUploadedCloset(baseUrl: string): ClosetItem[] {
@@ -50,6 +57,14 @@ function vibeScore(items: ClosetItem[], vibe: StyleVibe) {
     if (/trouser|pinstripe/.test(names)) score += 7;
     if (/collar|quarter-zip|mock-neck|knit/.test(names)) score += 4;
     if (/hoodie|sweatpants|joggers|track pants/.test(names)) score -= 8;
+    const top = items.find((item) => item.category === 'top');
+    const bottom = items.find((item) => item.category === 'bottom');
+    const hasBlueStripedShirt = Boolean(top && /blue.*strip|strip.*blue/i.test(top.name));
+    const hasBeigeTrousers = Boolean(bottom && /beige.*trouser|trouser.*beige/i.test(bottom.name));
+    const hasBrownLoafers = items.some((item) => item.category === 'footwear' && /brown.*loafer|loafer.*brown/i.test(item.name));
+    if (hasBlueStripedShirt) score += 12;
+    if (hasBeigeTrousers) score += 12;
+    if (hasBlueStripedShirt && hasBeigeTrousers && hasBrownLoafers) score += 60;
   } else if (vibe === 'Gym') {
     if (/joggers|sweatpants|track pants/.test(names)) score += 7;
     if (/t-shirt|hoodie|trainers/.test(names)) score += 4;
@@ -82,7 +97,7 @@ export function buildVibeOutfits(items: ClosetItem[], vibe: StyleVibe, excludedI
   const bottoms = items.filter((item) => item.category === 'bottom');
   const shoes = items.filter((item) => item.category === 'footwear');
   const finishers = items.filter((item) => item.category === 'layer' || item.category === 'accessory');
-  const workTops = tops.filter((item) => /shirt|collar|blouse|button.?up|button.?down|polo/i.test(item.name));
+  const workTops = tops.filter((item) => isWorkShirtName(item.name));
   const workBottoms = bottoms.filter((item) => /suit|dress|trouser|slack|pinstripe/i.test(item.name));
   const officeReady = vibe === 'Office / Work' && workTops.length > 0 && workBottoms.length > 0;
   const outfitTops = officeReady ? workTops : tops;

@@ -31,7 +31,7 @@ import {
 import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 import NotFound from '@/pages/not-found';
 import { createSampleCloset } from '@/data/sampleCloset';
-import { buildVibeOutfits, createUploadedCloset, type Outfit, type StyleVibe } from '@/data/uploadedCloset';
+import { buildVibeOutfits, createUploadedCloset, isWorkShirtName, type Outfit, type StyleVibe } from '@/data/uploadedCloset';
 
 type Category = 'top' | 'bottom' | 'footwear' | 'layer' | 'one-piece' | 'accessory';
 type WardrobeItem = { id: string; name: string; category: Category; photo: string; createdAt: number };
@@ -350,11 +350,11 @@ function WardrobeHome() {
   const [toast, setToast] = useState('');
   const [mobileMenu, setMobileMenu] = useState(false);
   const acceptedForVibe = useMemo(() => state.acceptedLooks.filter((look) => look.vibe === state.vibe), [state.acceptedLooks, state.vibe]);
+  const preparedOutfits = useMemo(() => buildVibeOutfits(state.items, state.vibe, [], 2000), [state.items, state.vibe]);
   const outfits = useMemo(() => {
-    const rejected = state.rejectedByVibe[state.vibe] || [];
-    const accepted = acceptedForVibe.map((look) => look.id);
-    return buildVibeOutfits(state.items, state.vibe, [...rejected, ...accepted], Math.max(0, 3 - acceptedForVibe.length));
-  }, [state.items, state.vibe, state.rejectedByVibe, acceptedForVibe]);
+    const excluded = new Set([...(state.rejectedByVibe[state.vibe] || []), ...acceptedForVibe.map((look) => look.id)]);
+    return preparedOutfits.filter((look) => !excluded.has(look.id)).slice(0, Math.max(0, 3 - acceptedForVibe.length));
+  }, [preparedOutfits, state.rejectedByVibe, state.vibe, acceptedForVibe]);
   const savedCount = state.dressedLooks.length;
 
   useEffect(() => {
@@ -517,7 +517,7 @@ function OutfitView({ items, vibe, onVibeChange, outfits, accepted, dressed, onA
   const visibleLooks = [...accepted.map((look) => ({ look, accepted: true })), ...outfits.map((look) => ({ look, accepted: false }))].slice(0, 3);
   const hasTop = items.some((item) => item.category === 'top');
   const hasBottom = items.some((item) => item.category === 'bottom');
-  const hasWorkShirt = items.some((item) => item.category === 'top' && /shirt|collar|blouse|button.?up|button.?down|polo/i.test(item.name));
+  const hasWorkShirt = items.some((item) => item.category === 'top' && isWorkShirtName(item.name));
   const hasWorkTrousers = items.some((item) => item.category === 'bottom' && /suit|dress|trouser|slack|pinstripe/i.test(item.name));
   const missingVibeHint = vibe === 'Office / Work' && !hasWorkShirt
     ? 'You do not have a shirt-style top saved yet, so these work looks use your closest uploaded tops.'
@@ -545,7 +545,11 @@ function OutfitView({ items, vibe, onVibeChange, outfits, accepted, dressed, onA
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">the edit · {vibe}</p><h2 className="mt-1 font-serif text-3xl">Three ways to go.</h2><p data-testid="text-prototype-label" className="mt-2 inline-flex rounded-full bg-accent/40 px-3 py-1.5 text-xs font-semibold text-foreground">Prototype suggestions — AI styling is simulated.</p></div><span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex"><CircleHelp size={15} /> Built from your closet</span></div>
         {missingVibeHint && <p data-testid="text-vibe-limitation" className="mb-4 rounded-2xl bg-secondary/70 px-4 py-3 text-sm text-muted-foreground">{missingVibeHint}</p>}
         <div className="grid gap-5 lg:grid-cols-3">{visibleLooks.map(({ look, accepted: isAccepted }, index) => <VibeOutfitCard key={look.id} look={look} index={index} accepted={isAccepted} alreadyDressed={dressed.includes(look.id)} onAccept={() => onAccept(look)} onReject={() => onReject(look)} onSave={() => onSaveDressed(look)} />)}</div>
-        {visibleLooks.length < 3 && <p className="mt-4 text-sm text-muted-foreground">No more distinct combinations for this vibe. Add a different top or bottom to explore more.</p>}
+        {visibleLooks.length < 3 && <p data-testid="text-outfit-pool-status" className="mt-4 text-sm text-muted-foreground">{outfits.length === 0
+          ? accepted.length > 0
+            ? 'No untried combinations remain for this vibe. Your accepted outfits stay visible; choose another vibe or add more pieces.'
+            : `You’ve tried every suitable ${vibe} combination in this wardrobe. Choose another vibe or add a different shirt, trouser, or shoe.`
+          : 'No more distinct combinations for this vibe. Add a different top or bottom to explore more.'}</p>}
       </section>
     </>}
   </div>;
