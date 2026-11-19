@@ -517,8 +517,12 @@ function OutfitView({ items, vibe, onVibeChange, outfits, accepted, dressed, onA
   const visibleLooks = [...accepted.map((look) => ({ look, accepted: true })), ...outfits.map((look) => ({ look, accepted: false }))].slice(0, 3);
   const hasTop = items.some((item) => item.category === 'top');
   const hasBottom = items.some((item) => item.category === 'bottom');
-  const missingVibeHint = vibe === 'Office / Work' && !items.some((item) => /trouser|pinstripe/i.test(item.name))
-    ? 'Your wardrobe has no tailored trousers yet, so these work looks use the closest bottoms you uploaded.'
+  const hasWorkShirt = items.some((item) => item.category === 'top' && /shirt|collar|blouse|button.?up|button.?down|polo/i.test(item.name));
+  const hasWorkTrousers = items.some((item) => item.category === 'bottom' && /suit|dress|trouser|slack|pinstripe/i.test(item.name));
+  const missingVibeHint = vibe === 'Office / Work' && !hasWorkShirt
+    ? 'You do not have a shirt-style top saved yet, so these work looks use your closest uploaded tops.'
+    : vibe === 'Office / Work' && !hasWorkTrousers
+      ? 'Your wardrobe has no tailored trousers yet, so these work looks use the closest bottoms you uploaded.'
     : vibe === 'Gym' && !items.some((item) => /jogger|sweatpant|track pant/i.test(item.name))
       ? 'Add joggers, sweatpants, or track pants for more gym-focused options.'
       : '';

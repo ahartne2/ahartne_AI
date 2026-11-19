@@ -81,9 +81,14 @@ export function buildVibeOutfits(items: ClosetItem[], vibe: StyleVibe, excludedI
   const bottoms = items.filter((item) => item.category === 'bottom');
   const shoes = items.filter((item) => item.category === 'footwear');
   const finishers = items.filter((item) => item.category === 'layer' || item.category === 'accessory');
+  const workTops = tops.filter((item) => /shirt|collar|blouse|button.?up|button.?down|polo/i.test(item.name));
+  const workBottoms = bottoms.filter((item) => /suit|dress|trouser|slack|pinstripe/i.test(item.name));
+  const officeReady = vibe === 'Office / Work' && workTops.length > 0 && workBottoms.length > 0;
+  const outfitTops = officeReady ? workTops : tops;
+  const outfitBottoms = officeReady ? workBottoms : bottoms;
   const bases: ClosetItem[][] = [];
-  tops.forEach((top) => bottoms.forEach((bottom) => bases.push([top, bottom])));
-  items.filter((item) => item.category === 'one-piece').forEach((piece) => bases.push([piece]));
+  outfitTops.forEach((top) => outfitBottoms.forEach((bottom) => bases.push([top, bottom])));
+  if (!officeReady) items.filter((item) => item.category === 'one-piece').forEach((piece) => bases.push([piece]));
   if (!bases.length) return [];
 
   const candidates: Outfit[] = [];
@@ -94,10 +99,12 @@ export function buildVibeOutfits(items: ClosetItem[], vibe: StyleVibe, excludedI
       const outfitItems = [...base, ...(shoe ? [shoe] : []), ...(finisher ? [finisher] : [])];
       const sortedIds = outfitItems.map((item) => item.id).sort();
       const signature = sortedIds.join('|');
-      const title = vibe === 'Office / Work' ? 'Ready for the day' : vibe === 'Gym' ? 'Move-ready' : vibe === 'Comfy' ? 'Comfort first' : 'Easy day out';
+      const title = officeReady ? 'Shirt + tailored trousers' : vibe === 'Office / Work' ? 'Ready for the day' : vibe === 'Gym' ? 'Move-ready' : vibe === 'Comfy' ? 'Comfort first' : 'Easy day out';
       const shoeText = shoe ? 'with your uploaded shoes' : '';
       const extraText = finisher ? 'and a saved finishing piece' : '';
-      const note = `${vibe === 'Office / Work' ? 'A polished, easy pairing' : vibe === 'Gym' ? 'A practical combination for movement' : vibe === 'Comfy' ? 'A soft, relaxed combination' : 'A relaxed everyday pairing'}${shoeText ? ` ${shoeText}` : ''}${extraText ? ` ${extraText}` : ''}.`;
+      const note = officeReady
+        ? `A work-ready pairing of ${base[0].name.toLowerCase()} and ${base[1].name.toLowerCase()}${shoe ? `, finished with ${shoe.name.toLowerCase()}` : ''}.`
+        : `${vibe === 'Office / Work' ? 'A polished, easy pairing' : vibe === 'Gym' ? 'A practical combination for movement' : vibe === 'Comfy' ? 'A soft, relaxed combination' : 'A relaxed everyday pairing'}${shoeText ? ` ${shoeText}` : ''}${extraText ? ` ${extraText}` : ''}.`;
       const id = `${vibe.toLowerCase().replace(/[^a-z]+/g, '-')}-${signature}`;
       if (!excludedIds.includes(id)) candidates.push({ id, title, note, vibe, items: outfitItems });
     }));
