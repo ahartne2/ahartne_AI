@@ -31,16 +31,27 @@ import {
 import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 import NotFound from '@/pages/not-found';
 import { createSampleCloset } from '@/data/sampleCloset';
+import { buildVibeOutfits, createUploadedCloset, type Outfit, type StyleVibe } from '@/data/uploadedCloset';
 
 type Category = 'top' | 'bottom' | 'footwear' | 'layer' | 'one-piece' | 'accessory';
 type WardrobeItem = { id: string; name: string; category: Category; photo: string; createdAt: number };
 type Feedback = { verdict: 'would' | 'wouldnt' | ''; reason: string };
-type AppState = { items: WardrobeItem[]; saved: string[]; feedback: Record<string, Feedback> };
+type DressedLook = Outfit & { savedAt: number };
+type AppState = {
+  items: WardrobeItem[];
+  saved: string[];
+  feedback: Record<string, Feedback>;
+  vibe: StyleVibe;
+  acceptedLooks: Outfit[];
+  rejectedByVibe: Partial<Record<StyleVibe, string[]>>;
+  dressedLooks: DressedLook[];
+};
 type Draft = { id?: string; name: string; category: Category; photo: string };
 
 const DB_NAME = 'wardrobe-local-v1';
 const STORE = 'app';
-const MAX_ITEMS = 19;
+const MAX_ITEMS = 100;
+const vibes: StyleVibe[] = ['Office / Work', 'Gym', 'Day Off', 'Comfy'];
 const categories: { value: Category; label: string; short: string }[] = [
   { value: 'top', label: 'Top', short: 'tops' },
   { value: 'bottom', label: 'Bottom', short: 'bottoms' },
@@ -49,7 +60,7 @@ const categories: { value: Category; label: string; short: string }[] = [
   { value: 'one-piece', label: 'One-piece', short: 'one-piece' },
   { value: 'accessory', label: 'Accessory', short: 'accessories' },
 ];
-const emptyState: AppState = { items: [], saved: [], feedback: {} };
+const emptyState: AppState = { items: [], saved: [], feedback: {}, vibe: 'Day Off', acceptedLooks: [], rejectedByVibe: {}, dressedLooks: [] };
 const queryClient = new QueryClient();
 
 function uid(prefix: string) {
@@ -70,7 +81,7 @@ async function loadState(): Promise<AppState> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const request = db.transaction(STORE, 'readonly').objectStore(STORE).get('state');
-    request.onsuccess = () => resolve(request.result || emptyState);
+    request.onsuccess = () => resolve({ ...emptyState, ...(request.result || {}) });
     request.onerror = () => reject(request.error);
   });
 }
@@ -333,17 +344,26 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
 function WardrobeHome() {
   const [state, setState] = useState<AppState>(emptyState);
   const [loaded, setLoaded] = useState(false);
-  const [activeView, setActiveView] = useState<'outfits' | 'wardrobe'>('outfits');
+  const [activeView, setActiveView] = useState<'outfits' | 'wardrobe' | 'dressed'>('outfits');
   const [modal, setModal] = useState<'add' | 'edit' | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [toast, setToast] = useState('');
   const [mobileMenu, setMobileMenu] = useState(false);
-  const outfits = useMemo(() => buildOutfits(state.items), [state.items]);
-  const savedCount = state.saved.length;
+  const acceptedForVibe = useMemo(() => state.acceptedLooks.filter((look) => look.vibe === state.vibe), [state.acceptedLooks, state.vibe]);
+  const outfits = useMemo(() => {
+    const rejected = state.rejectedByVibe[state.vibe] || [];
+    const accepted = acceptedForVibe.map((look) => look.id);
+    return buildVibeOutfits(state.items, state.vibe, [...rejected, ...accepted], Math.max(0, 3 - acceptedForVibe.length));
+  }, [state.items, state.vibe, state.rejectedByVibe, acceptedForVibe]);
+  const savedCount = state.dressedLooks.length;
 
   useEffect(() => {
     loadState().then((value) => {
-      setState(value);
+      const available = createUploadedCloset(import.meta.env.BASE_URL);
+      const ids = new Set(value.items.map((item) => item.id));
+      const missing = available.filter((item) => !ids.has(item.id));
+      const merged = { ...value, items: [...value.items, ...missing] };
+      setState(merged);
       setLoaded(true);
     }).catch(() => setLoaded(true));
   }, []);
@@ -379,7 +399,30 @@ function WardrobeHome() {
     const sampleItems = createSampleCloset();
     setState((current) => current.items.length === 0 ? { ...current, items: sampleItems } : current);
     setActiveView('outfits');
-    setToast('Loaded all 19 sample pieces.');
+    setToast('Loaded the sample closet.');
+  };
+  const acceptOutfit = (outfit: Outfit) => {
+    setState((current) => current.acceptedLooks.some((look) => look.id === outfit.id)
+      ? current
+      : { ...current, acceptedLooks: [...current.acceptedLooks, outfit] });
+    setToast('Added to today’s yes list.');
+  };
+  const rejectOutfit = (outfit: Outfit) => {
+    setState((current) => ({
+      ...current,
+      rejectedByVibe: { ...current.rejectedByVibe, [outfit.vibe]: [...new Set([...(current.rejectedByVibe[outfit.vibe] || []), outfit.id])] },
+    }));
+    setToast('Trying another combination.');
+  };
+  const saveDressedLook = (outfit: Outfit) => {
+    setState((current) => current.dressedLooks.some((look) => look.id === outfit.id)
+      ? current
+      : { ...current, dressedLooks: [...current.dressedLooks, { ...outfit, savedAt: Date.now() }] });
+    setToast('Saved to Dressed Wardrobe.');
+  };
+  const removeDressedLook = (id: string) => {
+    setState((current) => ({ ...current, dressedLooks: current.dressedLooks.filter((look) => look.id !== id) }));
+    setToast('Removed from Dressed Wardrobe.');
   };
 
   if (!loaded) return <LoadingState />;
@@ -396,6 +439,7 @@ function WardrobeHome() {
           <nav className="space-y-1" aria-label="Main navigation">
             <NavButton active={activeView === 'outfits'} onClick={() => setActiveView('outfits')} icon={<Sparkles size={17} />} label="Today’s edit" testId="nav-outfits" />
             <NavButton active={activeView === 'wardrobe'} onClick={() => setActiveView('wardrobe')} icon={<Archive size={17} />} label="My wardrobe" testId="nav-wardrobe" />
+            <NavButton active={activeView === 'dressed'} onClick={() => setActiveView('dressed')} icon={<Heart size={17} />} label="Dressed Wardrobe" testId="nav-dressed" />
           </nav>
         </div>
         <div className="mt-auto rounded-2xl border border-sidebar-border bg-sidebar-accent/80 p-4">
@@ -414,23 +458,23 @@ function WardrobeHome() {
         </button>
         <button type="button" data-testid="button-mobile-menu" aria-label="Open menu" onClick={() => setMobileMenu((open) => !open)} className="focus-ring rounded-xl p-2 text-muted-foreground"><Menu size={21} /></button>
       </header>
-      {mobileMenu && <div className="fixed right-4 top-[70px] z-30 rounded-2xl border border-border bg-card p-2 shadow-lg md:hidden"><NavButton active={activeView === 'outfits'} onClick={() => { setActiveView('outfits'); setMobileMenu(false); }} icon={<Sparkles size={16} />} label="Today’s edit" testId="mobile-nav-outfits" /><NavButton active={activeView === 'wardrobe'} onClick={() => { setActiveView('wardrobe'); setMobileMenu(false); }} icon={<Archive size={16} />} label="My wardrobe" testId="mobile-nav-wardrobe" /></div>}
+      {mobileMenu && <div className="fixed right-4 top-[70px] z-30 rounded-2xl border border-border bg-card p-2 shadow-lg md:hidden"><NavButton active={activeView === 'outfits'} onClick={() => { setActiveView('outfits'); setMobileMenu(false); }} icon={<Sparkles size={16} />} label="Today’s edit" testId="mobile-nav-outfits" /><NavButton active={activeView === 'wardrobe'} onClick={() => { setActiveView('wardrobe'); setMobileMenu(false); }} icon={<Archive size={16} />} label="My wardrobe" testId="mobile-nav-wardrobe" /><NavButton active={activeView === 'dressed'} onClick={() => { setActiveView('dressed'); setMobileMenu(false); }} icon={<Heart size={16} />} label="Dressed Wardrobe" testId="mobile-nav-dressed" /></div>}
 
       <main className="min-h-[100dvh] md:ml-[248px]">
         <div className="mx-auto max-w-[1180px] px-5 pb-20 pt-8 sm:px-8 md:px-12 md:pt-12">
           <div className="mb-10 flex items-end justify-between gap-5">
             <div className="wardrobe-rise">
-              <p className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[.2em] text-muted-foreground"><span className="size-1.5 rounded-full bg-accent" /> {activeView === 'outfits' ? 'A little direction' : 'Pieces you already love'}</p>
-              <h1 data-testid="text-page-title" className="max-w-2xl font-serif text-[clamp(2.7rem,6vw,5rem)] leading-[.96] tracking-[-.045em]">{activeView === 'outfits' ? <>Get dressed,<br /><em className="text-primary/75">your way.</em></> : <>The good<br /><em className="text-primary/75">stuff.</em></>}</h1>
+              <p className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[.2em] text-muted-foreground"><span className="size-1.5 rounded-full bg-accent" /> {activeView === 'outfits' ? 'A little direction' : activeView === 'wardrobe' ? 'Pieces you already love' : 'Looks you have worn'}</p>
+              <h1 data-testid="text-page-title" className="max-w-2xl font-serif text-[clamp(2.7rem,6vw,5rem)] leading-[.96] tracking-[-.045em]">{activeView === 'outfits' ? <>Get dressed,<br /><em className="text-primary/75">your way.</em></> : activeView === 'wardrobe' ? <>The good<br /><em className="text-primary/75">stuff.</em></> : <>Your dressed<br /><em className="text-primary/75">wardrobe.</em></>}</h1>
             </div>
-            <div className="hidden text-right sm:block wardrobe-rise delay-1"><p className="font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">saved looks</p><p data-testid="text-saved-count" className="mt-1 font-serif text-3xl">{String(savedCount).padStart(2, '0')}</p></div>
+            <div className="hidden text-right sm:block wardrobe-rise delay-1"><p className="font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">Dressed looks</p><p data-testid="text-saved-count" className="mt-1 font-serif text-3xl">{String(savedCount).padStart(2, '0')}</p></div>
           </div>
 
           {activeView === 'outfits' ? (
-            <OutfitView items={state.items} outfits={outfits} saved={state.saved} feedback={state.feedback} onToggleSaved={toggleSaved} onFeedback={updateFeedback} onAdd={() => { setEditingId(null); setModal('add'); }} onReview={() => setActiveView('wardrobe')} onTrySample={trySampleCloset} />
-          ) : (
+            <OutfitView items={state.items} vibe={state.vibe} onVibeChange={(vibe) => setState((current) => ({ ...current, vibe }))} outfits={outfits} accepted={acceptedForVibe} dressed={state.dressedLooks.map((look) => look.id)} onAccept={acceptOutfit} onReject={rejectOutfit} onSaveDressed={saveDressedLook} onAdd={() => { setEditingId(null); setModal('add'); }} onReview={() => setActiveView('wardrobe')} onTrySample={trySampleCloset} />
+          ) : activeView === 'wardrobe' ? (
             <WardrobeView items={state.items} onAdd={() => { setEditingId(null); setModal('add'); }} onEdit={(id) => { setEditingId(id); setModal('edit'); }} onRemove={removeItem} onBack={() => setActiveView('outfits')} />
-          )}
+          ) : <DressedWardrobe looks={state.dressedLooks} onRemove={removeDressedLook} onExplore={() => setActiveView('outfits')} />}
         </div>
       </main>
       {modal && <ItemModal mode={modal} existing={editingId ? state.items.find((item) => item.id === editingId) : undefined} remaining={MAX_ITEMS - state.items.length + (editingId ? 1 : 0)} onClose={() => setModal(null)} onSave={(drafts) => {
@@ -455,8 +499,29 @@ function LoadingState() {
 }
 
 type Look = ReturnType<typeof buildOutfits>[number];
-function OutfitView({ items, outfits, saved, feedback, onToggleSaved, onFeedback, onAdd, onReview, onTrySample }: { items: WardrobeItem[]; outfits: Look[]; saved: string[]; feedback: Record<string, Feedback>; onToggleSaved: (id: string) => void; onFeedback: (id: string, feedback: Feedback) => void; onAdd: () => void; onReview: () => void; onTrySample: () => void }) {
+function OutfitView({ items, vibe, onVibeChange, outfits, accepted, dressed, onAccept, onReject, onSaveDressed, onAdd, onReview, onTrySample }: {
+  items: WardrobeItem[];
+  vibe: StyleVibe;
+  onVibeChange: (vibe: StyleVibe) => void;
+  outfits: Outfit[];
+  accepted: Outfit[];
+  dressed: string[];
+  onAccept: (outfit: Outfit) => void;
+  onReject: (outfit: Outfit) => void;
+  onSaveDressed: (outfit: Outfit) => void;
+  onAdd: () => void;
+  onReview: () => void;
+  onTrySample: () => void;
+}) {
   const counts = categories.map((category) => ({ ...category, count: items.filter((item) => item.category === category.value).length })).filter((category) => category.count);
+  const visibleLooks = [...accepted.map((look) => ({ look, accepted: true })), ...outfits.map((look) => ({ look, accepted: false }))].slice(0, 3);
+  const hasTop = items.some((item) => item.category === 'top');
+  const hasBottom = items.some((item) => item.category === 'bottom');
+  const missingVibeHint = vibe === 'Office / Work' && !items.some((item) => /trouser|pinstripe/i.test(item.name))
+    ? 'Your wardrobe has no tailored trousers yet, so these work looks use the closest bottoms you uploaded.'
+    : vibe === 'Gym' && !items.some((item) => /jogger|sweatpant|track pant/i.test(item.name))
+      ? 'Add joggers, sweatpants, or track pants for more gym-focused options.'
+      : '';
   return <div className="space-y-10">
     <section className="wardrobe-rise rounded-[28px] border border-border bg-card p-6 shadow-[0_18px_50px_-35px_hsl(214_27%_18%/.45)] sm:p-8">
       <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
@@ -466,14 +531,63 @@ function OutfitView({ items, outfits, saved, feedback, onToggleSaved, onFeedback
       <div className="mt-7 flex flex-wrap items-center gap-2 border-t border-border/70 pt-5">{counts.length ? counts.map((item) => <span key={item.value} data-testid={`badge-category-${item.value}`} className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs text-secondary-foreground"><IconForCategory category={item.value} />{item.count} {item.short}</span>) : <span className="text-xs text-muted-foreground">Your closet is waiting for its first piece.</span>}<span className="ml-auto font-mono text-[10px] uppercase tracking-[.13em] text-muted-foreground">{items.length}/{MAX_ITEMS} pieces</span></div>
     </section>
 
-    {outfits.length < 3 ? <NeedMoreState items={items} onAdd={onAdd} onTrySample={onTrySample} limited={outfits.length > 0} /> : <section aria-label="Curated outfit ideas">
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">the edit</p><h2 className="mt-1 font-serif text-3xl">Three ways to go.</h2><p data-testid="text-prototype-label" className="mt-2 inline-flex rounded-full bg-accent/40 px-3 py-1.5 text-xs font-semibold text-foreground">Prototype suggestions — AI styling is simulated.</p></div><span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex"><CircleHelp size={15} /> Built from your closet</span></div>
-      <div className="grid gap-5 lg:grid-cols-3">{outfits.map((outfit, index) => <OutfitCard key={outfit.id} look={outfit} index={index} isSaved={saved.includes(outfit.id)} feedback={feedback[outfit.id] || { verdict: '', reason: '' }} onToggleSaved={() => onToggleSaved(outfit.id)} onFeedback={(value) => onFeedback(outfit.id, value)} />)}</div>
-    </section>}
-
-    {saved.length > 0 && <section data-testid="section-saved-summary" className="rounded-[24px] border border-border bg-primary px-6 py-5 text-primary-foreground sm:flex sm:items-center sm:justify-between sm:px-8"><div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-full bg-primary-foreground/10"><Heart size={18} fill="currentColor" /></span><div><p className="font-semibold">{saved.length} {saved.length === 1 ? 'look' : 'looks'} saved for later</p><p className="text-xs text-primary-foreground/65">Your little shortlist, kept on this device.</p></div></div><button type="button" data-testid="button-view-saved" onClick={() => document.getElementById('saved-anchor')?.scrollIntoView({ behavior: 'smooth' })} className="focus-ring mt-4 inline-flex items-center gap-2 text-sm font-semibold underline decoration-primary-foreground/35 underline-offset-4 sm:mt-0">See them in the edit <ArrowRight size={15} /></button></section>}
-    <div id="saved-anchor" className="h-px" />
+    {!hasTop || !hasBottom ? <NeedMoreState items={items} onAdd={onAdd} onTrySample={onTrySample} /> : <>
+      <section className="rounded-[28px] border border-border bg-card p-5 sm:p-7" aria-label="Choose today's vibe">
+        <p className="font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">start with the plan</p>
+        <h2 className="mt-1 font-serif text-3xl">What’s the vibe today?</h2>
+        <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">{vibes.map((option) => <button key={option} type="button" data-testid={`button-vibe-${option.toLowerCase().replace(/[^a-z]+/g, '-')}`} aria-pressed={vibe === option} onClick={() => onVibeChange(option)} className={`focus-ring min-h-12 rounded-2xl border px-3 text-sm font-semibold transition ${vibe === option ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background hover:bg-secondary'}`}>{option}</button>)}</div>
+      </section>
+      <section aria-label="Curated outfit ideas">
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">the edit · {vibe}</p><h2 className="mt-1 font-serif text-3xl">Three ways to go.</h2><p data-testid="text-prototype-label" className="mt-2 inline-flex rounded-full bg-accent/40 px-3 py-1.5 text-xs font-semibold text-foreground">Prototype suggestions — AI styling is simulated.</p></div><span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex"><CircleHelp size={15} /> Built from your closet</span></div>
+        {missingVibeHint && <p data-testid="text-vibe-limitation" className="mb-4 rounded-2xl bg-secondary/70 px-4 py-3 text-sm text-muted-foreground">{missingVibeHint}</p>}
+        <div className="grid gap-5 lg:grid-cols-3">{visibleLooks.map(({ look, accepted: isAccepted }, index) => <VibeOutfitCard key={look.id} look={look} index={index} accepted={isAccepted} alreadyDressed={dressed.includes(look.id)} onAccept={() => onAccept(look)} onReject={() => onReject(look)} onSave={() => onSaveDressed(look)} />)}</div>
+        {visibleLooks.length < 3 && <p className="mt-4 text-sm text-muted-foreground">No more distinct combinations for this vibe. Add a different top or bottom to explore more.</p>}
+      </section>
+    </>}
   </div>;
+}
+
+function VibeOutfitCard({ look, index, accepted, alreadyDressed, onAccept, onReject, onSave }: {
+  look: Outfit;
+  index: number;
+  accepted: boolean;
+  alreadyDressed: boolean;
+  onAccept: () => void;
+  onReject: () => void;
+  onSave: () => void;
+}) {
+  const top = look.items.find((item) => item.category === 'top');
+  const bottom = look.items.find((item) => item.category === 'bottom');
+  const onePiece = look.items.find((item) => item.category === 'one-piece');
+  const extras = look.items.filter((item) => ['footwear', 'layer', 'accessory'].includes(item.category));
+  const needsBeltTip = look.vibe === 'Office / Work' && bottom && /trouser/i.test(bottom.name);
+  const renderPiece = (item: WardrobeItem, position: string) => <figure key={item.id} className={`outfit-board-piece outfit-board-piece-${position}`}><BoardPhoto item={item} lookId={look.id} /></figure>;
+  return <article data-testid={`card-vibe-outfit-${look.id}`} className="overflow-hidden rounded-[24px] border border-border bg-card shadow-[0_12px_35px_-28px_hsl(214_27%_18%/.7)] wardrobe-rise" style={{ animationDelay: `${index * 80}ms` }}>
+    <div data-testid={`collage-vibe-outfit-${look.id}`} className={`outfit-board ${onePiece ? 'outfit-board-one-piece' : ''} ${extras.length ? 'outfit-board-with-extras' : ''}`}>
+      {onePiece ? renderPiece(onePiece, 'one-piece') : <>{top && renderPiece(top, 'top')}{bottom && renderPiece(bottom, 'bottom')}</>}
+      {extras.length > 0 && <aside className="outfit-board-extras" aria-label="Uploaded finishing pieces">{extras.map((item) => renderPiece(item, item.category))}</aside>}
+    </div>
+    <div className="p-5">
+      <div className="flex items-start justify-between gap-3"><div><p className="font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">{look.vibe} · look 0{index + 1}</p><h3 className="mt-1 font-serif text-2xl">{look.title}</h3><p className="mt-1 text-xs leading-relaxed text-muted-foreground">{look.note}</p></div>{accepted && <CheckCircle2 size={21} className="mt-1 shrink-0 text-primary" aria-label="Accepted" />}</div>
+      <div className="mt-4 space-y-2 border-t border-border/70 pt-4">{look.items.map((item) => <div key={item.id} className="flex items-center justify-between gap-3 text-xs"><span className="font-medium">{item.name}</span><span className="shrink-0 text-muted-foreground">{categoryLabel(item.category)}</span></div>)}</div>
+      {needsBeltTip && <p className="mt-3 rounded-xl bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">Have a black belt? Add it to your wardrobe for an optional finishing touch.</p>}
+      <div className="mt-5 grid gap-2">
+        {accepted ? <>
+          <div className="grid grid-cols-2 gap-2"><button type="button" aria-pressed="true" className="min-h-10 rounded-xl border border-primary bg-primary text-xs font-semibold text-primary-foreground"><Check size={14} className="mr-1 inline" /> Yes, I’d wear this</button><button type="button" onClick={onSave} disabled={alreadyDressed} className="focus-ring min-h-10 rounded-xl border border-border bg-background text-xs font-semibold disabled:cursor-default disabled:opacity-60" data-testid={`button-save-dressed-${look.id}`}><Heart size={14} className="mr-1 inline" /> {alreadyDressed ? 'Saved to Dressed' : 'Save to Dressed'}</button></div>
+        </> : <div className="grid grid-cols-2 gap-2"><button type="button" data-testid={`button-accept-outfit-${look.id}`} onClick={onAccept} className="focus-ring min-h-10 rounded-xl border border-primary bg-primary text-xs font-semibold text-primary-foreground"><Check size={14} className="mr-1 inline" /> Yes, I’d wear this</button><button type="button" data-testid={`button-reject-outfit-${look.id}`} onClick={onReject} className="focus-ring min-h-10 rounded-xl border border-border bg-background text-xs font-semibold transition hover:bg-secondary"><RefreshCcw size={14} className="mr-1 inline" /> No, try again</button></div>}
+      </div>
+    </div>
+  </article>;
+}
+
+function DressedWardrobe({ looks, onRemove, onExplore }: { looks: DressedLook[]; onRemove: (id: string) => void; onExplore: () => void }) {
+  return <section data-testid="section-dressed-wardrobe" className="space-y-6">
+    <div className="flex flex-col justify-between gap-4 rounded-[28px] border border-border bg-card p-6 sm:flex-row sm:items-center sm:p-8"><div><p className="mb-2 font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">the looks you said yes to</p><h2 className="font-serif text-3xl">Dressed Wardrobe</h2><p className="mt-2 text-sm text-muted-foreground">Your accepted outfits are saved on this device.</p></div><button type="button" onClick={onExplore} className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-primary px-4 text-sm font-semibold text-primary"><Sparkles size={16} /> Explore outfits</button></div>
+    {looks.length ? <div className="grid gap-5 lg:grid-cols-3">{looks.map((look) => <article key={look.id} data-testid={`card-dressed-look-${look.id}`} className="overflow-hidden rounded-[24px] border border-border bg-card">
+      <div className="outfit-board">{look.items.map((item) => <figure key={item.id} className={`outfit-board-piece outfit-board-piece-${item.category}`}><BoardPhoto item={item} lookId={`dressed-${look.id}`} /></figure>)}</div>
+      <div className="p-5"><p className="font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">{look.vibe}</p><h3 className="mt-1 font-serif text-2xl">{look.title}</h3><p className="mt-1 text-xs text-muted-foreground">{look.note}</p><ul className="mt-4 space-y-1.5 border-t border-border/70 pt-4">{look.items.map((item) => <li key={item.id} className="text-xs font-medium">{item.name} <span className="font-normal text-muted-foreground">· {categoryLabel(item.category)}</span></li>)}</ul><button type="button" data-testid={`button-remove-dressed-${look.id}`} onClick={() => onRemove(look.id)} className="focus-ring mt-4 min-h-10 rounded-full border border-border px-4 text-xs font-semibold text-muted-foreground hover:bg-secondary"><Trash2 size={14} className="mr-1 inline" /> Remove saved look</button></div>
+    </article>)}</div> : <div data-testid="state-empty-dressed" className="rounded-[28px] border border-dashed border-border p-10 text-center"><Heart size={28} className="mx-auto text-primary/70" /><h3 className="mt-4 font-serif text-2xl">Nothing saved here yet.</h3><p className="mt-2 text-sm text-muted-foreground">Choose “Yes, I’d wear this,” then save that look to your Dressed Wardrobe.</p></div>}
+  </section>;
 }
 
 function NeedMoreState({ items, onAdd, onTrySample, limited = false }: { items: WardrobeItem[]; onAdd: () => void; onTrySample: () => void; limited?: boolean }) {

@@ -547,6 +547,7 @@
   min-height: 0;
   object-fit: contain;
   object-position: center;
+  background-color: #fff;
 }
 
 .outfit-board-piece-footwear,
