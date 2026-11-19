@@ -4,7 +4,7 @@ A mobile-friendly wardrobe prototype for putting together casual outfits from cl
 
 ## What it does
 
-- Stores up to eight wardrobe photos in this browser.
+- Stores up to 19 wardrobe photos in this browser, or loads a 19-piece sample closet.
 - Builds three prepared outfit suggestions from uploaded items only.
 - Includes shoes, layers, or accessories only when they are in the wardrobe.
 - Lets you save looks and record “Would wear” or “Wouldn’t wear” feedback with a short reason.

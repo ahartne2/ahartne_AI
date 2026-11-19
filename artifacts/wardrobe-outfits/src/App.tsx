@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 import NotFound from '@/pages/not-found';
+import { createSampleCloset } from '@/data/sampleCloset';
 
 type Category = 'top' | 'bottom' | 'footwear' | 'layer' | 'one-piece' | 'accessory';
 type WardrobeItem = { id: string; name: string; category: Category; photo: string; createdAt: number };
@@ -39,7 +40,7 @@ type Draft = { id?: string; name: string; category: Category; photo: string };
 
 const DB_NAME = 'wardrobe-local-v1';
 const STORE = 'app';
-const MAX_ITEMS = 8;
+const MAX_ITEMS = 19;
 const categories: { value: Category; label: string; short: string }[] = [
   { value: 'top', label: 'Top', short: 'tops' },
   { value: 'bottom', label: 'Bottom', short: 'bottoms' },
@@ -314,7 +315,6 @@ function App() {
           <RoutedErrorBoundary>
             <Switch>
               <Route path="/" component={WardrobeHome} />
-              <Route path="/__board-layout-check" component={BoardLayoutCheck} />
               <Route component={NotFound} />
             </Switch>
           </RoutedErrorBoundary>
@@ -375,6 +375,12 @@ function WardrobeHome() {
     setState((current) => ({ ...current, items: current.items.filter((item) => item.id !== id) }));
     setToast('Piece removed.');
   };
+  const trySampleCloset = () => {
+    const sampleItems = createSampleCloset();
+    setState((current) => current.items.length === 0 ? { ...current, items: sampleItems } : current);
+    setActiveView('outfits');
+    setToast('Loaded all 19 sample pieces.');
+  };
 
   if (!loaded) return <LoadingState />;
 
@@ -421,7 +427,7 @@ function WardrobeHome() {
           </div>
 
           {activeView === 'outfits' ? (
-            <OutfitView items={state.items} outfits={outfits} saved={state.saved} feedback={state.feedback} onToggleSaved={toggleSaved} onFeedback={updateFeedback} onAdd={() => { setEditingId(null); setModal('add'); }} onReview={() => setActiveView('wardrobe')} />
+            <OutfitView items={state.items} outfits={outfits} saved={state.saved} feedback={state.feedback} onToggleSaved={toggleSaved} onFeedback={updateFeedback} onAdd={() => { setEditingId(null); setModal('add'); }} onReview={() => setActiveView('wardrobe')} onTrySample={trySampleCloset} />
           ) : (
             <WardrobeView items={state.items} onAdd={() => { setEditingId(null); setModal('add'); }} onEdit={(id) => { setEditingId(id); setModal('edit'); }} onRemove={removeItem} onBack={() => setActiveView('outfits')} />
           )}
@@ -449,7 +455,7 @@ function LoadingState() {
 }
 
 type Look = ReturnType<typeof buildOutfits>[number];
-function OutfitView({ items, outfits, saved, feedback, onToggleSaved, onFeedback, onAdd, onReview }: { items: WardrobeItem[]; outfits: Look[]; saved: string[]; feedback: Record<string, Feedback>; onToggleSaved: (id: string) => void; onFeedback: (id: string, feedback: Feedback) => void; onAdd: () => void; onReview: () => void }) {
+function OutfitView({ items, outfits, saved, feedback, onToggleSaved, onFeedback, onAdd, onReview, onTrySample }: { items: WardrobeItem[]; outfits: Look[]; saved: string[]; feedback: Record<string, Feedback>; onToggleSaved: (id: string) => void; onFeedback: (id: string, feedback: Feedback) => void; onAdd: () => void; onReview: () => void; onTrySample: () => void }) {
   const counts = categories.map((category) => ({ ...category, count: items.filter((item) => item.category === category.value).length })).filter((category) => category.count);
   return <div className="space-y-10">
     <section className="wardrobe-rise rounded-[28px] border border-border bg-card p-6 shadow-[0_18px_50px_-35px_hsl(214_27%_18%/.45)] sm:p-8">
@@ -460,7 +466,7 @@ function OutfitView({ items, outfits, saved, feedback, onToggleSaved, onFeedback
       <div className="mt-7 flex flex-wrap items-center gap-2 border-t border-border/70 pt-5">{counts.length ? counts.map((item) => <span key={item.value} data-testid={`badge-category-${item.value}`} className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs text-secondary-foreground"><IconForCategory category={item.value} />{item.count} {item.short}</span>) : <span className="text-xs text-muted-foreground">Your closet is waiting for its first piece.</span>}<span className="ml-auto font-mono text-[10px] uppercase tracking-[.13em] text-muted-foreground">{items.length}/{MAX_ITEMS} pieces</span></div>
     </section>
 
-    {outfits.length < 3 ? <NeedMoreState items={items} onAdd={onAdd} limited={outfits.length > 0} /> : <section aria-label="Curated outfit ideas">
+    {outfits.length < 3 ? <NeedMoreState items={items} onAdd={onAdd} onTrySample={onTrySample} limited={outfits.length > 0} /> : <section aria-label="Curated outfit ideas">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">the edit</p><h2 className="mt-1 font-serif text-3xl">Three ways to go.</h2><p data-testid="text-prototype-label" className="mt-2 inline-flex rounded-full bg-accent/40 px-3 py-1.5 text-xs font-semibold text-foreground">Prototype suggestions — AI styling is simulated.</p></div><span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex"><CircleHelp size={15} /> Built from your closet</span></div>
       <div className="grid gap-5 lg:grid-cols-3">{outfits.map((outfit, index) => <OutfitCard key={outfit.id} look={outfit} index={index} isSaved={saved.includes(outfit.id)} feedback={feedback[outfit.id] || { verdict: '', reason: '' }} onToggleSaved={() => onToggleSaved(outfit.id)} onFeedback={(value) => onFeedback(outfit.id, value)} />)}</div>
     </section>}
@@ -470,7 +476,7 @@ function OutfitView({ items, outfits, saved, feedback, onToggleSaved, onFeedback
   </div>;
 }
 
-function NeedMoreState({ items, onAdd, limited = false }: { items: WardrobeItem[]; onAdd: () => void; limited?: boolean }) {
+function NeedMoreState({ items, onAdd, onTrySample, limited = false }: { items: WardrobeItem[]; onAdd: () => void; onTrySample: () => void; limited?: boolean }) {
   const hasTop = items.some((item) => item.category === 'top');
   const hasBottom = items.some((item) => item.category === 'bottom');
   const hasOnePiece = items.some((item) => item.category === 'one-piece');
@@ -484,7 +490,7 @@ function NeedMoreState({ items, onAdd, limited = false }: { items: WardrobeItem[
     : hasBase
       ? 'Your closet has a complete base, but not enough different combinations yet. Add another piece in a top, bottom, one-piece, footwear, or layer/accessory category. We’ll only use items you add.'
       : `Add ${missing.length ? missing.join(' and ') : 'a top and bottom, or a one-piece'} to create a complete base. Footwear, outerwear, and accessories are optional; they appear only if you add them.`;
-  return <section data-testid="state-needs-more" className="overflow-hidden rounded-[28px] border border-dashed border-border bg-secondary/45 p-7 sm:p-10"><div className="grid gap-8 md:grid-cols-[1fr_auto] md:items-center"><div><span className="mb-4 inline-flex size-11 items-center justify-center rounded-2xl bg-accent text-accent-foreground"><Sparkles size={20} /></span><h2 className="font-serif text-3xl">{title}</h2><p data-testid="text-missing-category" className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">{description}</p><button type="button" data-testid="button-add-first-piece" onClick={onAdd} className="focus-ring mt-6 inline-flex min-h-12 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground transition hover:-translate-y-0.5"><Plus size={17} /> Add a piece</button></div><div className="relative mx-auto flex size-44 items-center justify-center rounded-full border border-border bg-card md:mr-10"><div className="absolute inset-5 rounded-full border border-dashed border-border" /><Shirt size={45} strokeWidth={1.2} className="text-primary/70" /></div></div></section>;
+  return <section data-testid="state-needs-more" className="overflow-hidden rounded-[28px] border border-dashed border-border bg-secondary/45 p-7 sm:p-10"><div className="grid gap-8 md:grid-cols-[1fr_auto] md:items-center"><div><span className="mb-4 inline-flex size-11 items-center justify-center rounded-2xl bg-accent text-accent-foreground"><Sparkles size={20} /></span><h2 className="font-serif text-3xl">{title}</h2><p data-testid="text-missing-category" className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">{description}</p><div className="mt-6 flex flex-wrap gap-3"><button type="button" data-testid="button-add-first-piece" onClick={onAdd} className="focus-ring inline-flex min-h-12 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground transition hover:-translate-y-0.5"><Plus size={17} /> Add a piece</button>{items.length === 0 && !limited && <button type="button" data-testid="button-try-sample-closet" onClick={onTrySample} className="focus-ring inline-flex min-h-12 items-center gap-2 rounded-full border border-primary px-5 text-sm font-semibold text-primary transition hover:bg-card">Try a sample closet <ArrowRight size={16} /></button>}</div></div><div className="relative mx-auto flex size-44 items-center justify-center rounded-full border border-border bg-card md:mr-10"><div className="absolute inset-5 rounded-full border border-dashed border-border" /><Shirt size={45} strokeWidth={1.2} className="text-primary/70" /></div></div></section>;
 }
 
 function OutfitCard({ look, index, isSaved, feedback, onToggleSaved, onFeedback }: { look: Look; index: number; isSaved: boolean; feedback: Feedback; onToggleSaved: () => void; onFeedback: (feedback: Feedback) => void }) {
@@ -523,46 +529,6 @@ function OutfitCard({ look, index, isSaved, feedback, onToggleSaved, onFeedback 
       <div className="mt-5 rounded-2xl bg-muted/70 p-3.5"><div className="mb-3 flex items-center gap-2 text-xs font-semibold"><MessageCircle size={15} className="text-primary/70" /> Your take</div><div className="grid grid-cols-2 gap-2"><button type="button" data-testid={`button-would-wear-${look.id}`} onClick={() => { setReasonError(''); onFeedback({ ...feedback, verdict: 'would' }); }} className={`focus-ring min-h-10 rounded-xl border text-xs font-semibold transition ${feedback.verdict === 'would' ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card hover:bg-secondary'}`}><Check size={14} className="mr-1 inline" /> Would wear</button><button type="button" data-testid={`button-wouldnt-wear-${look.id}`} onClick={() => { setReasonError(''); onFeedback({ ...feedback, verdict: 'wouldnt' }); }} className={`focus-ring min-h-10 rounded-xl border text-xs font-semibold transition ${feedback.verdict === 'wouldnt' ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card hover:bg-secondary'}`}><X size={14} className="mr-1 inline" /> Wouldn’t wear</button></div><form onSubmit={submitReason} className="mt-2 flex gap-2"><label htmlFor={`reason-${look.id}`} className="sr-only">Short reason for your choice</label><input id={`reason-${look.id}`} data-testid={`input-reason-${look.id}`} value={reason} onChange={(event) => { setReason(event.target.value); setReasonError(''); }} maxLength={120} placeholder="Add a short reason" aria-invalid={Boolean(reasonError)} className="focus-ring min-w-0 flex-1 rounded-xl border border-border bg-card px-3 text-xs outline-none placeholder:text-muted-foreground/70" /><button type="submit" data-testid={`button-save-feedback-${look.id}`} className="focus-ring grid size-10 shrink-0 place-items-center rounded-xl bg-card text-primary transition hover:bg-secondary" aria-label="Save your response"><Save size={15} /></button></form>{reasonError && <p role="alert" data-testid={`status-feedback-error-${look.id}`} className="mt-2 text-xs text-destructive">{reasonError}</p>}</div>
     </div>
   </article>;
-}
-
-function BoardLayoutCheck() {
-  const svgPhoto = (svg: string) => `data:image/svg+xml,${encodeURIComponent(svg)}`;
-  const items: WardrobeItem[] = [
-    {
-      id: 'check-shirt',
-      name: 'Soft blue shirt',
-      category: 'top',
-      createdAt: 0,
-      photo: svgPhoto('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="400" viewBox="0 0 320 400"><rect width="320" height="400" fill="white"/><path fill="#83A8B5" d="M112 82 145 65l15 25 15-25 34 17 38 34-24 54-31-16v165H128V154l-32 16-24-54z"/><path fill="#F3F5F4" d="m145 65 15 25 15-25-15 8z"/><path stroke="#648895" stroke-width="4" d="M160 95v215"/></svg>'),
-    },
-    {
-      id: 'check-trousers',
-      name: 'Relaxed navy trousers',
-      category: 'bottom',
-      createdAt: 0,
-      photo: svgPhoto('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="400" viewBox="0 0 320 400"><rect width="320" height="400" fill="white"/><path fill="#35485C" d="M91 54h138l-10 105 27 188-76 5-10-147-11 147-76-5 28-188z"/><path fill="none" stroke="#536578" stroke-width="4" d="M160 61v143"/></svg>'),
-    },
-    {
-      id: 'check-shoes',
-      name: 'White trainers',
-      category: 'footwear',
-      createdAt: 0,
-      photo: svgPhoto('<svg xmlns="http://www.w3.org/2000/svg" width="360" height="180" viewBox="0 0 360 180"><rect width="360" height="180" fill="white"/><path fill="#E9E4D9" stroke="#A89F91" stroke-width="5" d="M37 90 95 82l34-43 35 58 61 25q25 10 27 29H37zM195 94l47-7 32-36 32 45 33 19q16 8 16 24H195z"/><path fill="none" stroke="#A89F91" stroke-width="4" d="M52 140h185m-30 0h148"/></svg>'),
-    },
-  ];
-  const look: Look = {
-    id: 'layout-check',
-    title: 'Easy day out',
-    note: 'A relaxed top-and-bottom pairing, finished with your saved shoes.',
-    items,
-  };
-
-  return <main className="min-h-screen bg-background px-4 py-5 sm:px-8">
-    <div className="mx-auto max-w-[360px]">
-      <p className="mb-3 font-mono text-xs uppercase tracking-[.15em] text-muted-foreground">temporary board layout check</p>
-      <OutfitCard look={look} index={0} isSaved={false} feedback={{ verdict: '', reason: '' }} onToggleSaved={() => {}} onFeedback={() => {}} />
-    </div>
-  </main>;
 }
 
 function WardrobeView({ items, onAdd, onEdit, onRemove, onBack }: { items: WardrobeItem[]; onAdd: () => void; onEdit: (id: string) => void; onRemove: (id: string) => void; onBack: () => void }) {
