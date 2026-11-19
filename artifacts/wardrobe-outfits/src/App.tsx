@@ -414,6 +414,13 @@ function WardrobeHome() {
     }));
     setToast('Trying another combination.');
   };
+  const restartVibeSuggestions = () => {
+    setState((current) => ({
+      ...current,
+      rejectedByVibe: { ...current.rejectedByVibe, [current.vibe]: [] },
+    }));
+    setToast('Showing this vibe’s combinations again.');
+  };
   const saveDressedLook = (outfit: Outfit) => {
     setState((current) => current.dressedLooks.some((look) => look.id === outfit.id)
       ? current
@@ -471,7 +478,7 @@ function WardrobeHome() {
           </div>
 
           {activeView === 'outfits' ? (
-            <OutfitView items={state.items} vibe={state.vibe} onVibeChange={(vibe) => setState((current) => ({ ...current, vibe }))} outfits={outfits} accepted={acceptedForVibe} dressed={state.dressedLooks.map((look) => look.id)} onAccept={acceptOutfit} onReject={rejectOutfit} onSaveDressed={saveDressedLook} onAdd={() => { setEditingId(null); setModal('add'); }} onReview={() => setActiveView('wardrobe')} onTrySample={trySampleCloset} />
+            <OutfitView items={state.items} vibe={state.vibe} onVibeChange={(vibe) => setState((current) => ({ ...current, vibe }))} outfits={outfits} hasPreparedOptions={preparedOutfits.length > 0} accepted={acceptedForVibe} dressed={state.dressedLooks.map((look) => look.id)} onAccept={acceptOutfit} onReject={rejectOutfit} onSaveDressed={saveDressedLook} onRestartVibe={restartVibeSuggestions} onAdd={() => { setEditingId(null); setModal('add'); }} onReview={() => setActiveView('wardrobe')} onTrySample={trySampleCloset} />
           ) : activeView === 'wardrobe' ? (
             <WardrobeView items={state.items} onAdd={() => { setEditingId(null); setModal('add'); }} onEdit={(id) => { setEditingId(id); setModal('edit'); }} onRemove={removeItem} onBack={() => setActiveView('outfits')} />
           ) : <DressedWardrobe looks={state.dressedLooks} onRemove={removeDressedLook} onExplore={() => setActiveView('outfits')} />}
@@ -499,16 +506,18 @@ function LoadingState() {
 }
 
 type Look = ReturnType<typeof buildOutfits>[number];
-function OutfitView({ items, vibe, onVibeChange, outfits, accepted, dressed, onAccept, onReject, onSaveDressed, onAdd, onReview, onTrySample }: {
+function OutfitView({ items, vibe, onVibeChange, outfits, hasPreparedOptions, accepted, dressed, onAccept, onReject, onSaveDressed, onRestartVibe, onAdd, onReview, onTrySample }: {
   items: WardrobeItem[];
   vibe: StyleVibe;
   onVibeChange: (vibe: StyleVibe) => void;
   outfits: Outfit[];
+  hasPreparedOptions: boolean;
   accepted: Outfit[];
   dressed: string[];
   onAccept: (outfit: Outfit) => void;
   onReject: (outfit: Outfit) => void;
   onSaveDressed: (outfit: Outfit) => void;
+  onRestartVibe: () => void;
   onAdd: () => void;
   onReview: () => void;
   onTrySample: () => void;
@@ -545,11 +554,16 @@ function OutfitView({ items, vibe, onVibeChange, outfits, accepted, dressed, onA
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">the edit · {vibe}</p><h2 className="mt-1 font-serif text-3xl">Three ways to go.</h2><p data-testid="text-prototype-label" className="mt-2 inline-flex rounded-full bg-accent/40 px-3 py-1.5 text-xs font-semibold text-foreground">Prototype suggestions — AI styling is simulated.</p></div><span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex"><CircleHelp size={15} /> Built from your closet</span></div>
         {missingVibeHint && <p data-testid="text-vibe-limitation" className="mb-4 rounded-2xl bg-secondary/70 px-4 py-3 text-sm text-muted-foreground">{missingVibeHint}</p>}
         <div className="grid gap-5 lg:grid-cols-3">{visibleLooks.map(({ look, accepted: isAccepted }, index) => <VibeOutfitCard key={look.id} look={look} index={index} accepted={isAccepted} alreadyDressed={dressed.includes(look.id)} onAccept={() => onAccept(look)} onReject={() => onReject(look)} onSave={() => onSaveDressed(look)} />)}</div>
-        {visibleLooks.length < 3 && <p data-testid="text-outfit-pool-status" className="mt-4 text-sm text-muted-foreground">{outfits.length === 0
-          ? accepted.length > 0
-            ? 'No untried combinations remain for this vibe. Your accepted outfits stay visible; choose another vibe or add more pieces.'
-            : `You’ve tried every suitable ${vibe} combination in this wardrobe. Choose another vibe or add a different shirt, trouser, or shoe.`
-          : 'No more distinct combinations for this vibe. Add a different top or bottom to explore more.'}</p>}
+        {visibleLooks.length < 3 && <div data-testid="text-outfit-pool-status" className="mt-4 flex flex-col items-start gap-3 text-sm text-muted-foreground">
+          <p>{outfits.length === 0
+            ? !hasPreparedOptions
+              ? `There are no complete ${vibe} combinations in this wardrobe yet. Add a suitable top and bottom, then try again.`
+              : accepted.length > 0
+                ? 'No untried combinations remain for this vibe. Your accepted outfits stay visible.'
+                : `You’ve tried every suitable ${vibe} combination in this wardrobe.`
+            : 'No more distinct combinations for this vibe. Add a different top or bottom to explore more.'}</p>
+          {outfits.length === 0 && hasPreparedOptions && <button type="button" data-testid="button-restart-vibe" onClick={onRestartVibe} className="focus-ring min-h-10 rounded-full border border-primary px-4 text-xs font-semibold text-primary transition hover:bg-secondary">Start this vibe over</button>}
+        </div>}
       </section>
     </>}
   </div>;
