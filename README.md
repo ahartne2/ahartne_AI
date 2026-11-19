@@ -8,7 +8,9 @@ A mobile-friendly wardrobe prototype for putting together outfits from clothing 
 
 ## Demo Video
 
-**Pending: the video's actual sharing link has not been supplied.** The previously supplied Google Drive homepage URL has been removed because it does not link to a video. Add a video-file sharing link here and confirm both instructors have Viewer access before submitting.
+[Watch the Wardrobe demo video on Google Drive](https://drive.google.com/file/d/1WZnmevGBr6rEIEK_PTTNWk9vnsctIIJC/view?usp=sharing)
+
+Ensure both instructors have Viewer access. The sharing link is provided; video playback and viewer permissions have not been independently verified.
 
 ## What it does
 
