@@ -362,7 +362,9 @@ function WardrobeHome() {
       const available = createUploadedCloset(import.meta.env.BASE_URL);
       const ids = new Set(value.items.map((item) => item.id));
       const missing = available.filter((item) => !ids.has(item.id));
-      const merged = { ...value, items: [...value.items, ...missing] };
+      // Rejections belong to this browsing session, not the permanent wardrobe.
+      // A refresh starts a new set of suggestions without removing accepted/saved looks.
+      const merged = { ...value, items: [...value.items, ...missing], rejectedByVibe: {} };
       setState(merged);
       setLoaded(true);
     }).catch(() => setLoaded(true));

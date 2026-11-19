@@ -1,0 +1,1 @@
+- [Outfit suggestion lifetime](outfit-suggestion-lifetime.md) — rejections must not permanently exhaust a vibe; preserve accepted outfits and Dressed Wardrobe.

@@ -133,11 +133,11 @@ export function buildVibeOutfits(items: ClosetItem[], vibe: StyleVibe, excludedI
   const pool = candidates
     .map((outfit) => ({ outfit, score: vibeScore(outfit.items, vibe) }))
     .sort((a, b) => b.score - a.score || a.outfit.id.localeCompare(b.outfit.id));
+  const used = new Set<string>();
   while (selected.length < limit && pool.length) {
     let bestIndex = 0;
     let bestScore = Number.NEGATIVE_INFINITY;
     pool.forEach(({ outfit, score }, index) => {
-      const used = new Set(selected.flatMap((look) => look.items.map((item) => item.id)));
       const newPieces = outfit.items.filter((item) => !used.has(item.id)).length;
       const adjusted = score + newPieces * 0.6;
       if (adjusted > bestScore) {
@@ -145,7 +145,9 @@ export function buildVibeOutfits(items: ClosetItem[], vibe: StyleVibe, excludedI
         bestIndex = index;
       }
     });
-    selected.push(pool.splice(bestIndex, 1)[0].outfit);
+    const next = pool.splice(bestIndex, 1)[0].outfit;
+    selected.push(next);
+    next.items.forEach((item) => used.add(item.id));
   }
   return selected;
 }
