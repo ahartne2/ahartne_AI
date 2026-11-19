@@ -6,6 +6,10 @@ A mobile-friendly wardrobe prototype for putting together outfits from clothing 
 
 **Open the app:** https://wardrobe-outfit-prototype.replit.app/
 
+## Demo Video
+
+**Pending: the video's actual sharing link has not been supplied.** The previously supplied Google Drive homepage URL has been removed because it does not link to a video. Add a video-file sharing link here and confirm both instructors have Viewer access before submitting.
+
 ## What it does
 
 - Supports up to 100 wardrobe items, with bundled clothing photos and the ability to upload and edit your own pieces.
@@ -44,15 +48,21 @@ The production build is written to `artifacts/wardrobe-outfits/dist/public/`.
 
 ## Revisions and evaluation
 
-- [Representative prompts and revisions](ai-use-disclosure.md#representative-prompts-and-revisions)
-- [Human judgment and corrections](ai-use-disclosure.md#human-judgment-and-corrections)
-- [Verification and unresolved work](ai-use-disclosure.md#verification-and-unresolved-work)
+- [Full revision and evaluation document](revision-and-ai-disclosure.md)
+- [Priority improvements and response to peer feedback](revision-and-ai-disclosure.md#1-priority-improvements-and-response-to-peer-feedback)
+- [Five functional code checks and their scope](revision-and-ai-disclosure.md#2-five-distinct-evaluation-cases)
+- [Interpretation of the results](revision-and-ai-disclosure.md#interpretation)
+- [Before-and-after comparison](revision-and-ai-disclosure.md#3-before-and-after-comparison)
+- [Remaining limitations and next priorities](revision-and-ai-disclosure.md#4-remaining-limitations-and-next-priorities)
+- [Concrete risk response](revision-and-ai-disclosure.md#5-concrete-risk-response)
 
 The supplied disclosure reports five **functional code checks**, not a full browser test suite. Its reported Office fallback and accessory-suitability limitations remain documented. The reported HTTP 200/page-title check establishes page access only, not interactive correctness. Full browser persistence, mobile interaction, actual response-time measurements, final video access, and clothing-cutout fidelity still require the checks described in that document. This documentation-only repository update does not add new test results or resolve those limitations.
 
 ## AI-Use Disclosure
 
 Read the [AI-use disclosure](ai-use-disclosure.md), including [tools and contributions](ai-use-disclosure.md#tools-and-contributions) and [AI inside the product](ai-use-disclosure.md#ai-inside-the-product). It distinguishes AI assistance used to develop the prototype from its current deterministic, simulated styling logic.
+
+The revision document also includes a [draft AI-use disclosure](revision-and-ai-disclosure.md#6-draft-ai-use-disclosure) covering representative prompts, human decisions, verification, and unresolved work.
 
 ## Three Quick Tests — October 8, 2026
 
@@ -69,5 +79,3 @@ These results and limitations document the earlier prototype tested on the date 
 1. Styling is simulated. Current suggestions do not assess colour or pattern compatibility, and explanations are generic. Future work will test more useful styling recommendations.
 2. Suggestions offer limited variety: the tested results reused one shirt across all three outfits. Selection should make better use of available tops.
 3. The tested development link requires Replit access. A publicly accessible prototype link still needs to be verified before submission.
-
-GOOGLE DRIVE LIVE DEMO https://drive.google.com/drive/home?dmr=1&ec=wgc-drive-%5Bmodule%5D-goto
