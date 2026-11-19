@@ -57,3 +57,5 @@ These results and limitations document the earlier prototype tested on the date 
 1. Styling is simulated. Current suggestions do not assess colour or pattern compatibility, and explanations are generic. Future work will test more useful styling recommendations.
 2. Suggestions offer limited variety: the tested results reused one shirt across all three outfits. Selection should make better use of available tops.
 3. The tested development link requires Replit access. A publicly accessible prototype link still needs to be verified before submission.
+
+GOOGLE DRIVE LIVE DEMO https://drive.google.com/drive/home?dmr=1&ec=wgc-drive-%5Bmodule%5D-goto
