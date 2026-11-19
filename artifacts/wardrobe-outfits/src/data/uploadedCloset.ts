@@ -23,6 +23,7 @@ const uploadedPieces: Array<[string, string, ClosetCategory, string]> = [
   ['uploaded-17-cream-blue-fringe-knit', 'Cream and blue fringe knit', 'top', 'cream-blue-fringe-knit.png'],
   ['uploaded-18-striped-yellow-long-sleeve', 'Striped yellow logo long-sleeve', 'top', 'striped-yellow-logo-long-sleeve.png'],
   ['uploaded-19-navy-suede-clogs', 'Navy suede Boston clogs', 'footwear', 'navy-suede-boston-clogs.png'],
+  ['uploaded-20-burgundy-leather-belt', 'Burgundy leather belt', 'accessory', 'burgundy-leather-belt.png'],
 ];
 
 export function createUploadedCloset(baseUrl: string): ClosetItem[] {
@@ -86,6 +87,7 @@ export function buildVibeOutfits(items: ClosetItem[], vibe: StyleVibe, excludedI
   const officeReady = vibe === 'Office / Work' && workTops.length > 0 && workBottoms.length > 0;
   const outfitTops = officeReady ? workTops : tops;
   const outfitBottoms = officeReady ? workBottoms : bottoms;
+  const officeAccessories = finishers.filter((item) => item.category === 'accessory');
   const bases: ClosetItem[][] = [];
   outfitTops.forEach((top) => outfitBottoms.forEach((bottom) => bases.push([top, bottom])));
   if (!officeReady) items.filter((item) => item.category === 'one-piece').forEach((piece) => bases.push([piece]));
@@ -94,7 +96,9 @@ export function buildVibeOutfits(items: ClosetItem[], vibe: StyleVibe, excludedI
   const candidates: Outfit[] = [];
   bases.forEach((base) => {
     const shoeOptions: Array<ClosetItem | undefined> = shoes.length ? shoes : [undefined];
-    const finishOptions: Array<ClosetItem | undefined> = finishers.length ? [undefined, ...finishers] : [undefined];
+    const finishOptions: Array<ClosetItem | undefined> = vibe === 'Office / Work' && officeAccessories.length
+      ? officeAccessories
+      : finishers.length ? [undefined, ...finishers] : [undefined];
     shoeOptions.forEach((shoe) => finishOptions.forEach((finisher) => {
       const outfitItems = [...base, ...(shoe ? [shoe] : []), ...(finisher ? [finisher] : [])];
       const sortedIds = outfitItems.map((item) => item.id).sort();

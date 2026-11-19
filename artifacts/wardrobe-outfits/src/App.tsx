@@ -564,7 +564,7 @@ function VibeOutfitCard({ look, index, accepted, alreadyDressed, onAccept, onRej
   const bottom = look.items.find((item) => item.category === 'bottom');
   const onePiece = look.items.find((item) => item.category === 'one-piece');
   const extras = look.items.filter((item) => ['footwear', 'layer', 'accessory'].includes(item.category));
-  const needsBeltTip = look.vibe === 'Office / Work' && bottom && /trouser/i.test(bottom.name);
+  const needsBeltTip = look.vibe === 'Office / Work' && bottom && /trouser/i.test(bottom.name) && !look.items.some((item) => /belt/i.test(item.name));
   const renderPiece = (item: WardrobeItem, position: string) => <figure key={item.id} className={`outfit-board-piece outfit-board-piece-${position}`}><BoardPhoto item={item} lookId={look.id} /></figure>;
   return <article data-testid={`card-vibe-outfit-${look.id}`} className="overflow-hidden rounded-[24px] border border-border bg-card shadow-[0_12px_35px_-28px_hsl(214_27%_18%/.7)] wardrobe-rise" style={{ animationDelay: `${index * 80}ms` }}>
     <div data-testid={`collage-vibe-outfit-${look.id}`} className={`outfit-board ${onePiece ? 'outfit-board-one-piece' : ''} ${extras.length ? 'outfit-board-with-extras' : ''}`}>
